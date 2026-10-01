@@ -12,7 +12,7 @@
     {
       "binding": "DB",
       "database_name": "study-chatbot-db",
-      "database_id": "da9b7355-e28b-46e6-a2ad-9e6ab3224980",
+      "database_id": "addb844a-3772-411f-abc4-bc7543b11a62",
       "migrations_dir": "migrations"
     }
   ],

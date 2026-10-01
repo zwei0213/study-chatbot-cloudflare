@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
     },
     incomingRequests: false,
   },
+  outputFileTracingIncludes: {
+    "**/*": [
+      "./node_modules/pg-cloudflare/dist/**",
+      "./node_modules/pg-cloudflare/esm/**",
+    ],
+  },
   poweredByHeader: false,
   reactCompiler: true,
 };

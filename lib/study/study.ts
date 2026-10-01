@@ -9,7 +9,7 @@ export function isStudyCondition(value: string): value is StudyCondition {
 }
 
 export function getStudyPrompt(condition: StudyCondition) {
-  return `${prompts.common}\n\n${prompts[condition]}`;
+  return [prompts.common, prompts.responseLength, prompts[condition]].join("\n\n");
 }
 
 export const studyWelcome = prompts.welcome;

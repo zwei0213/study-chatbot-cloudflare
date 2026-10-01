@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { isProductionEnvironment } from "@/lib/constants";
 
 type RateLimitBinding = {
-  limit(input: { key: string }): Promise<{ success: boolean }>;
+  limit: (input: { key: string }) => Promise<{ success: boolean }>;
 };
 
 type CloudflareRateLimitEnv = {
@@ -28,7 +28,9 @@ export async function checkIpRateLimit(
   const { env } = await getCloudflareContext({ async: true });
   const bindings = env as CloudflareRateLimitEnv;
   const limiter =
-    purpose === "chat" ? bindings.CHAT_RATE_LIMITER : bindings.ADMIN_RATE_LIMITER;
+    purpose === "chat"
+      ? bindings.CHAT_RATE_LIMITER
+      : bindings.ADMIN_RATE_LIMITER;
   if (!limiter) {
     throw new Error(`Cloudflare ${purpose} rate limit binding is missing.`);
   }

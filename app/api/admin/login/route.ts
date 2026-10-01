@@ -10,7 +10,10 @@ import {
 export async function POST(request: Request) {
   if (!isStudyAdminTokenConfigured()) {
     return NextResponse.json(
-      { error: "请先在 Cloudflare Workers 中设置至少 32 位的 STUDY_ADMIN_TOKEN。" },
+      {
+        error:
+          "请先在 Cloudflare Workers 中设置至少 32 位的 STUDY_ADMIN_TOKEN。",
+      },
       { status: 503 }
     );
   }

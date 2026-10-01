@@ -363,7 +363,9 @@ export function StudyAdmin({
         );
       }
       setKeyStatus((await response.json()) as ApiKeyStatus);
-      setNotice("已移除后台覆盖值；现在使用 Cloudflare Worker Secret 中的 Key。");
+      setNotice(
+        "已移除后台覆盖值；现在使用 Cloudflare Worker Secret 中的 Key。"
+      );
       setConfirmKeyReset(false);
     } catch (cause) {
       setError(
@@ -404,7 +406,8 @@ export function StudyAdmin({
           </p>
           <h1 className="mt-3 text-2xl font-semibold">研究管理后台</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            输入 Cloudflare Worker Secret STUDY_ADMIN_TOKEN 登录。密钥需至少 32 个字符。
+            输入 Cloudflare Worker Secret STUDY_ADMIN_TOKEN 登录。密钥需至少 32
+            个字符。
           </p>
           <form className="mt-6 space-y-4" onSubmit={handleLogin}>
             <label className="block text-sm font-medium" htmlFor="admin-token">

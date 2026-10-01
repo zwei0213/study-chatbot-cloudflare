@@ -66,35 +66,37 @@ export function updateStudySession(
   userId: string,
   action: "start" | "end"
 ) {
-  return getDb().then((db) => db.transaction(async (tx) => {
-    const [session] = await tx
-      .select()
-      .from(studySession)
-      .where(and(eq(studySession.id, id), eq(studySession.userId, userId)))
-      .for("update");
-    if (!session) {
-      throw new StudySessionError("无权访问该对话。", 403);
-    }
-    if (session.endedAt || (action === "start" && session.startedAt)) {
-      return session;
-    }
+  return getDb().then((db) =>
+    db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(studySession)
+        .where(and(eq(studySession.id, id), eq(studySession.userId, userId)))
+        .for("update");
+      if (!session) {
+        throw new StudySessionError("无权访问该对话。", 403);
+      }
+      if (session.endedAt || (action === "start" && session.startedAt)) {
+        return session;
+      }
 
-    const now = new Date();
-    if (
-      action === "end" &&
-      (!session.startedAt ||
-        getStudyElapsedSeconds(session.startedAt, null, now.getTime()) <
-          STUDY_MIN_SECONDS)
-    ) {
-      throw new StudySessionError("对话满 10 分钟后才能结束，请继续交流。");
-    }
-    const [updated] = await tx
-      .update(studySession)
-      .set(action === "start" ? { startedAt: now } : { endedAt: now })
-      .where(eq(studySession.id, id))
-      .returning();
-    return updated;
-  }));
+      const now = new Date();
+      if (
+        action === "end" &&
+        (!session.startedAt ||
+          getStudyElapsedSeconds(session.startedAt, null, now.getTime()) <
+            STUDY_MIN_SECONDS)
+      ) {
+        throw new StudySessionError("对话满 10 分钟后才能结束，请继续交流。");
+      }
+      const [updated] = await tx
+        .update(studySession)
+        .set(action === "start" ? { startedAt: now } : { endedAt: now })
+        .where(eq(studySession.id, id))
+        .returning();
+      return updated;
+    })
+  );
 }
 
 export function saveStudyExchange(
@@ -102,39 +104,41 @@ export function saveStudyExchange(
   userText: string,
   assistantText: string
 ) {
-  return getDb().then((db) => db.transaction(async (tx) => {
-    const [session] = await tx
-      .select()
-      .from(studySession)
-      .where(eq(studySession.id, sessionId))
-      .for("update");
-    if (!session?.startedAt || session.endedAt) {
-      throw new StudySessionError("本次对话尚未开始或已经结束，请刷新页面。");
-    }
-    const [{ total }] = await tx
-      .select({ total: count() })
-      .from(studyMessage)
-      .where(eq(studyMessage.sessionId, sessionId));
-    const [userMessage] = await tx
-      .insert(studyMessage)
-      .values({
-        content: userText,
-        role: "user",
-        sequence: total + 1,
-        sessionId,
-      })
-      .returning();
-    const [assistantMessage] = await tx
-      .insert(studyMessage)
-      .values({
-        content: assistantText,
-        role: "assistant",
-        sequence: total + 2,
-        sessionId,
-      })
-      .returning();
-    return [userMessage, assistantMessage];
-  }));
+  return getDb().then((db) =>
+    db.transaction(async (tx) => {
+      const [session] = await tx
+        .select()
+        .from(studySession)
+        .where(eq(studySession.id, sessionId))
+        .for("update");
+      if (!session?.startedAt || session.endedAt) {
+        throw new StudySessionError("本次对话尚未开始或已经结束，请刷新页面。");
+      }
+      const [{ total }] = await tx
+        .select({ total: count() })
+        .from(studyMessage)
+        .where(eq(studyMessage.sessionId, sessionId));
+      const [userMessage] = await tx
+        .insert(studyMessage)
+        .values({
+          content: userText,
+          role: "user",
+          sequence: total + 1,
+          sessionId,
+        })
+        .returning();
+      const [assistantMessage] = await tx
+        .insert(studyMessage)
+        .values({
+          content: assistantText,
+          role: "assistant",
+          sequence: total + 2,
+          sessionId,
+        })
+        .returning();
+      return [userMessage, assistantMessage];
+    })
+  );
 }
 
 export async function getStudyExportRows() {
@@ -239,20 +243,22 @@ export async function getStudyAdminSessionDetail(id: string) {
 }
 
 export function deleteStudyAdminSession(id: string) {
-  return getDb().then((db) => db.transaction(async (tx) => {
-    const [session] = await tx
-      .select({ id: studySession.id })
-      .from(studySession)
-      .where(eq(studySession.id, id))
-      .for("update");
-    if (!session) {
-      return false;
-    }
+  return getDb().then((db) =>
+    db.transaction(async (tx) => {
+      const [session] = await tx
+        .select({ id: studySession.id })
+        .from(studySession)
+        .where(eq(studySession.id, id))
+        .for("update");
+      if (!session) {
+        return false;
+      }
 
-    await tx.delete(studyMessage).where(eq(studyMessage.sessionId, id));
-    await tx.delete(studySession).where(eq(studySession.id, id));
-    return true;
-  }));
+      await tx.delete(studyMessage).where(eq(studyMessage.sessionId, id));
+      await tx.delete(studySession).where(eq(studySession.id, id));
+      return true;
+    })
+  );
 }
 
 export async function getStudyAdminSetting(key: string) {

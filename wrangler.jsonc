@@ -8,6 +8,14 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "study-chatbot-db",
+      "database_id": "da9b7355-e28b-46e6-a2ad-9e6ab3224980",
+      "migrations_dir": "migrations"
+    }
+  ],
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",

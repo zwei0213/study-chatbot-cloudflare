@@ -11,9 +11,6 @@ importers:
       bcrypt-ts:
         specifier: ^8.0.1
         version: 8.0.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@vercel/postgres@0.10.0)(kysely@0.28.11)(pg@8.23.1)(postgres@3.4.9)
@@ -23,15 +20,6 @@ importers:
       next-auth:
         specifier: 5.0.0-beta.25
         version: 5.0.0-beta.25(next@16.3.6(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(@types/node@24.13.2)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
-      pg:
-        specifier: ^8.23.1
-        version: 8.23.1
-      pg-cloudflare:
-        specifier: ^1.4.1
-        version: 1.4.1
-      postgres:
-        specifier: ^3.4.9
-        version: 3.4.9
       react:
         specifier: 19.2.7
         version: 19.2.7
@@ -57,9 +45,6 @@ importers:
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
-      '@types/pg':
-        specifier: ^8.23.1
-        version: 8.23.1
       '@types/react':
         specifier: ^18
         version: 18.3.31
@@ -75,9 +60,6 @@ importers:
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
-      tsx:
-        specifier: ^4.23.0
-        version: 4.23.0
       typescript:
         specifier: ^5.6.3
         version: 5.8.2
@@ -1703,10 +1685,6 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
-  dotenv@17.4.2:
-    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
-    engines: {node: '>=12'}
-
   drizzle-orm@0.45.2:
     resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
     peerDependencies:
@@ -2804,11 +2782,6 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
-
-  tsx@4.23.0:
-    resolution: {integrity: sha512-eUdUIaCr963q2h5u3+QwvYp0+eqPvn+egeqZUm0hwERCqqx1E3kK5ehbGCvqSE5MQAULr67ww0cA3jKc3YkM1w==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
 
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
@@ -4404,6 +4377,7 @@ snapshots:
       '@types/node': 24.13.2
       pg-protocol: 1.16.1
       pg-types: 2.2.0
+    optional: true
 
   '@types/prop-types@15.7.15': {}
 
@@ -4651,8 +4625,6 @@ snapshots:
   detect-libc@2.1.2: {}
 
   dotenv@16.6.1: {}
-
-  dotenv@17.4.2: {}
 
   drizzle-orm@0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@vercel/postgres@0.10.0)(kysely@0.28.11)(pg@8.23.1)(postgres@3.4.9):
     optionalDependencies:
@@ -5358,9 +5330,11 @@ snapshots:
   pg-cloudflare@1.4.1:
     optional: true
 
-  pg-connection-string@2.14.1: {}
+  pg-connection-string@2.14.1:
+    optional: true
 
-  pg-int8@1.0.1: {}
+  pg-int8@1.0.1:
+    optional: true
 
   pg-numeric@1.0.2:
     optional: true
@@ -5368,8 +5342,10 @@ snapshots:
   pg-pool@3.14.0(pg@8.23.1):
     dependencies:
       pg: 8.23.1
+    optional: true
 
-  pg-protocol@1.16.1: {}
+  pg-protocol@1.16.1:
+    optional: true
 
   pg-types@2.2.0:
     dependencies:
@@ -5378,6 +5354,7 @@ snapshots:
       postgres-bytea: 1.0.1
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
+    optional: true
 
   pg-types@4.0.2:
     dependencies:
@@ -5399,10 +5376,12 @@ snapshots:
       pgpass: 1.0.5
     optionalDependencies:
       pg-cloudflare: 1.4.1
+    optional: true
 
   pgpass@1.0.5:
     dependencies:
       split2: 4.2.0
+    optional: true
 
   picocolors@1.1.1: {}
 
@@ -5436,19 +5415,22 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postgres-array@2.0.0: {}
+  postgres-array@2.0.0:
+    optional: true
 
   postgres-array@3.0.4:
     optional: true
 
-  postgres-bytea@1.0.1: {}
+  postgres-bytea@1.0.1:
+    optional: true
 
   postgres-bytea@3.0.0:
     dependencies:
       obuf: 1.1.2
     optional: true
 
-  postgres-date@1.0.7: {}
+  postgres-date@1.0.7:
+    optional: true
 
   postgres-date@2.1.0:
     optional: true
@@ -5456,6 +5438,7 @@ snapshots:
   postgres-interval@1.2.0:
     dependencies:
       xtend: 4.0.2
+    optional: true
 
   postgres-interval@3.0.0:
     optional: true
@@ -5463,7 +5446,8 @@ snapshots:
   postgres-range@1.1.4:
     optional: true
 
-  postgres@3.4.9: {}
+  postgres@3.4.9:
+    optional: true
 
   preact-render-to-string@5.2.3(preact@10.11.3):
     dependencies:
@@ -5633,7 +5617,8 @@ snapshots:
 
   source-map@0.6.1: {}
 
-  split2@4.2.0: {}
+  split2@4.2.0:
+    optional: true
 
   statuses@2.0.2: {}
 
@@ -5694,12 +5679,6 @@ snapshots:
   ts-tqdm@0.8.6: {}
 
   tslib@2.8.1: {}
-
-  tsx@4.23.0:
-    dependencies:
-      esbuild: 0.28.1
-    optionalDependencies:
-      fsevents: 2.3.3
 
   type-check@0.4.0:
     dependencies:
@@ -5806,7 +5785,8 @@ snapshots:
     optionalDependencies:
       bufferutil: 4.0.9
 
-  xtend@4.0.2: {}
+  xtend@4.0.2:
+    optional: true
 
   y18n@5.0.8: {}
 

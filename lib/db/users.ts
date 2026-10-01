@@ -9,8 +9,7 @@ export async function createGuestUser() {
   const db = await getDb();
   const email = `guest-${randomUUID()}`;
   const password = hashSync(randomUUID(), genSaltSync(10));
-  return db.insert(user).values({ email, password }).returning({
-    email: user.email,
-    id: user.id,
-  });
+  const id = randomUUID();
+  await db.insert(user).values({ email, id, password });
+  return [{ email, id }];
 }

@@ -1,44 +1,47 @@
-import type { InferSelectModel } from "drizzle-orm";
+import { sql, type InferSelectModel } from "drizzle-orm";
 import {
-  boolean,
   integer,
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
   uniqueIndex,
-  uuid,
-  varchar,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 
-export const user = pgTable("User", {
-  createdAt: timestamp("createdAt").notNull().defaultNow(),
-  email: varchar("email", { length: 64 }).notNull(),
-  emailVerified: boolean("emailVerified").notNull().default(false),
-  id: uuid("id").primaryKey().notNull().defaultRandom(),
+const createdAt = (name = "createdAt") =>
+  integer(name, { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`);
+
+export const user = sqliteTable("User", {
+  createdAt: createdAt(),
+  email: text("email").notNull(),
+  emailVerified: integer("emailVerified", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  id: text("id").primaryKey().notNull(),
   image: text("image"),
-  isAnonymous: boolean("isAnonymous").notNull().default(false),
+  isAnonymous: integer("isAnonymous", { mode: "boolean" })
+    .notNull()
+    .default(false),
   name: text("name"),
-  password: varchar("password", { length: 64 }),
-  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+  password: text("password"),
+  updatedAt: createdAt("updatedAt"),
 });
 
 export type User = InferSelectModel<typeof user>;
 
-export const studySession = pgTable(
+export const studySession = sqliteTable(
   "StudySession",
   {
-    condition: varchar("condition", { enum: ["a", "b"], length: 1 }).notNull(),
-    createdAt: timestamp("createdAt", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    endedAt: timestamp("endedAt", { withTimezone: true }),
-    id: uuid("id").primaryKey().notNull().defaultRandom(),
-    model: varchar("model", { length: 64 }).notNull(),
-    startedAt: timestamp("startedAt", { withTimezone: true }),
+    condition: text("condition", { enum: ["a", "b"] }).notNull(),
+    createdAt: createdAt(),
+    endedAt: integer("endedAt", { mode: "timestamp_ms" }),
+    id: text("id").primaryKey().notNull(),
+    model: text("model").notNull(),
+    startedAt: integer("startedAt", { mode: "timestamp_ms" }),
     systemPrompt: text("systemPrompt").notNull(),
-    userId: uuid("userId")
+    userId: text("userId")
       .notNull()
-      .references(() => user.id),
+      .references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => ({
     participantCondition: uniqueIndex("StudySession_user_condition_idx").on(
@@ -50,19 +53,17 @@ export const studySession = pgTable(
 
 export type StudySession = InferSelectModel<typeof studySession>;
 
-export const studyMessage = pgTable(
+export const studyMessage = sqliteTable(
   "StudyMessage",
   {
     content: text("content").notNull(),
-    createdAt: timestamp("createdAt", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    id: uuid("id").primaryKey().notNull().defaultRandom(),
-    role: varchar("role", { enum: ["user", "assistant"], length: 9 }).notNull(),
+    createdAt: createdAt(),
+    id: text("id").primaryKey().notNull(),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
     sequence: integer("sequence").notNull(),
-    sessionId: uuid("sessionId")
+    sessionId: text("sessionId")
       .notNull()
-      .references(() => studySession.id),
+      .references(() => studySession.id, { onDelete: "cascade" }),
   },
   (table) => ({
     sessionSequence: uniqueIndex("StudyMessage_session_sequence_idx").on(
@@ -74,10 +75,10 @@ export const studyMessage = pgTable(
 
 export type StudyMessage = InferSelectModel<typeof studyMessage>;
 
-export const studyAdminSetting = pgTable("StudyAdminSetting", {
-  key: varchar("key", { length: 80 }).primaryKey().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true })
+export const studyAdminSetting = sqliteTable("StudyAdminSetting", {
+  key: text("key").primaryKey().notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
+    .default(sql`(unixepoch() * 1000)`),
   value: text("value").notNull(),
 });

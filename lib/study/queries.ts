@@ -1,6 +1,19 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, type SQL, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  like,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { studyAdminSetting, studyMessage, studySession } from "@/lib/db/schema";
 import { getStudyPrompt, STUDY_MODEL, type StudyCondition } from "./study";
@@ -19,6 +32,7 @@ export async function getOrCreateStudySession(
     .insert(studySession)
     .values({
       condition,
+      id: randomUUID(),
       model: STUDY_MODEL,
       systemPrompt: getStudyPrompt(condition),
       userId,
@@ -61,84 +75,113 @@ export async function getStudyMessages(sessionId: string) {
     .orderBy(asc(studyMessage.sequence));
 }
 
-export function updateStudySession(
+export async function updateStudySession(
   id: string,
   userId: string,
   action: "start" | "end"
 ) {
-  return getDb().then((db) =>
-    db.transaction(async (tx) => {
-      const [session] = await tx
-        .select()
-        .from(studySession)
-        .where(and(eq(studySession.id, id), eq(studySession.userId, userId)))
-        .for("update");
-      if (!session) {
-        throw new StudySessionError("无权访问该对话。", 403);
-      }
-      if (session.endedAt || (action === "start" && session.startedAt)) {
-        return session;
-      }
+  const db = await getDb();
+  const [session] = await db
+    .select()
+    .from(studySession)
+    .where(and(eq(studySession.id, id), eq(studySession.userId, userId)))
+    .limit(1);
 
-      const now = new Date();
-      if (
-        action === "end" &&
-        (!session.startedAt ||
-          getStudyElapsedSeconds(session.startedAt, null, now.getTime()) <
-            STUDY_MIN_SECONDS)
-      ) {
-        throw new StudySessionError("对话满 10 分钟后才能结束，请继续交流。");
-      }
-      const [updated] = await tx
-        .update(studySession)
-        .set(action === "start" ? { startedAt: now } : { endedAt: now })
-        .where(eq(studySession.id, id))
-        .returning();
-      return updated;
-    })
-  );
+  if (!session) {
+    throw new StudySessionError("无权访问该对话。", 403);
+  }
+  if (session.endedAt || (action === "start" && session.startedAt)) {
+    return session;
+  }
+
+  const now = new Date();
+  if (
+    action === "end" &&
+    (!session.startedAt ||
+      getStudyElapsedSeconds(session.startedAt, null, now.getTime()) <
+        STUDY_MIN_SECONDS)
+  ) {
+    throw new StudySessionError("对话满 10 分钟后才能结束，请继续交流。");
+  }
+
+  const updateCondition =
+    action === "start"
+      ? and(
+          eq(studySession.id, id),
+          eq(studySession.userId, userId),
+          isNull(studySession.startedAt),
+          isNull(studySession.endedAt)
+        )
+      : and(
+          eq(studySession.id, id),
+          eq(studySession.userId, userId),
+          isNotNull(studySession.startedAt),
+          isNull(studySession.endedAt)
+        );
+
+  await db
+    .update(studySession)
+    .set(action === "start" ? { startedAt: now } : { endedAt: now })
+    .where(updateCondition);
+
+  const [updated] = await db
+    .select()
+    .from(studySession)
+    .where(eq(studySession.id, id))
+    .limit(1);
+  return updated ?? session;
 }
 
-export function saveStudyExchange(
+export async function saveStudyExchange(
   sessionId: string,
   userText: string,
   assistantText: string
 ) {
-  return getDb().then((db) =>
-    db.transaction(async (tx) => {
-      const [session] = await tx
-        .select()
-        .from(studySession)
-        .where(eq(studySession.id, sessionId))
-        .for("update");
-      if (!session?.startedAt || session.endedAt) {
-        throw new StudySessionError("本次对话尚未开始或已经结束，请刷新页面。");
-      }
-      const [{ total }] = await tx
-        .select({ total: count() })
-        .from(studyMessage)
-        .where(eq(studyMessage.sessionId, sessionId));
-      const [userMessage] = await tx
-        .insert(studyMessage)
-        .values({
-          content: userText,
-          role: "user",
-          sequence: total + 1,
-          sessionId,
-        })
-        .returning();
-      const [assistantMessage] = await tx
-        .insert(studyMessage)
-        .values({
-          content: assistantText,
-          role: "assistant",
-          sequence: total + 2,
-          sessionId,
-        })
-        .returning();
-      return [userMessage, assistantMessage];
-    })
-  );
+  const db = await getDb();
+  const [session] = await db
+    .select({ endedAt: studySession.endedAt, startedAt: studySession.startedAt })
+    .from(studySession)
+    .where(eq(studySession.id, sessionId))
+    .limit(1);
+  if (!session?.startedAt || session.endedAt) {
+    throw new StudySessionError("本次对话尚未开始或已经结束，请刷新页面。");
+  }
+
+  const createdAt = new Date();
+  const userMessageId = randomUUID();
+  const assistantMessageId = randomUUID();
+  const nextSequence = sql<number>`COALESCE((SELECT MAX(${studyMessage.sequence}) FROM ${studyMessage} WHERE ${studyMessage.sessionId} = ${sessionId}), 0) + 1`;
+
+  await db.batch([
+    db.insert(studyMessage).values({
+      content: userText,
+      createdAt,
+      id: userMessageId,
+      role: "user",
+      sequence: nextSequence,
+      sessionId,
+    }),
+    db.insert(studyMessage).values({
+      content: assistantText,
+      createdAt,
+      id: assistantMessageId,
+      role: "assistant",
+      sequence: nextSequence,
+      sessionId,
+    }),
+  ]);
+
+  const savedMessages = await db
+    .select()
+    .from(studyMessage)
+    .where(
+      or(eq(studyMessage.id, userMessageId), eq(studyMessage.id, assistantMessageId))
+    )
+    .orderBy(asc(studyMessage.sequence));
+  if (savedMessages.length !== 2) {
+    throw new Error("Unable to save the complete study exchange");
+  }
+  return savedMessages;
 }
 
 export async function getStudyExportRows() {
@@ -179,9 +222,12 @@ export async function listStudyAdminSessions({
     filters.push(eq(studySession.condition, condition));
   }
   if (query) {
-    const pattern = `%${query}%`;
+    const pattern = `%${query.toLowerCase()}%`;
     filters.push(
-      sql`(${studySession.id}::text ILIKE ${pattern} OR ${studySession.userId}::text ILIKE ${pattern})`
+      or(
+        like(sql`lower(${studySession.id})`, pattern),
+        like(sql`lower(${studySession.userId})`, pattern)
+      )!
     );
   }
   const where = filters.length > 0 ? and(...filters) : undefined;
@@ -196,7 +242,7 @@ export async function listStudyAdminSessions({
       createdAt: studySession.createdAt,
       endedAt: studySession.endedAt,
       id: studySession.id,
-      messageCount: sql<number>`count(${studyMessage.id})::int`,
+      messageCount: sql<number>`count(${studyMessage.id})`,
       model: studySession.model,
       startedAt: studySession.startedAt,
       userId: studySession.userId,
@@ -242,23 +288,13 @@ export async function getStudyAdminSessionDetail(id: string) {
   return { ...session, messages };
 }
 
-export function deleteStudyAdminSession(id: string) {
-  return getDb().then((db) =>
-    db.transaction(async (tx) => {
-      const [session] = await tx
-        .select({ id: studySession.id })
-        .from(studySession)
-        .where(eq(studySession.id, id))
-        .for("update");
-      if (!session) {
-        return false;
-      }
-
-      await tx.delete(studyMessage).where(eq(studyMessage.sessionId, id));
-      await tx.delete(studySession).where(eq(studySession.id, id));
-      return true;
-    })
-  );
+export async function deleteStudyAdminSession(id: string) {
+  const db = await getDb();
+  const deleted = await db
+    .delete(studySession)
+    .where(eq(studySession.id, id))
+    .returning({ id: studySession.id });
+  return deleted.length > 0;
 }
 
 export async function getStudyAdminSetting(key: string) {

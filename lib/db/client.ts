@@ -1,32 +1,22 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/d1";
 import { cache } from "react";
 import { studyAdminSetting, studyMessage, studySession, user } from "./schema";
 
-type HyperdriveEnv = {
-  HYPERDRIVE?: { connectionString: string };
+type D1Env = {
+  DB?: unknown;
 };
 
 export const getDb = cache(async () => {
-  let connectionString = process.env.POSTGRES_URL;
-
-  if (!connectionString) {
-    const { env } = await getCloudflareContext({ async: true });
-    connectionString = (env as HyperdriveEnv).HYPERDRIVE?.connectionString;
+  const { env } = await getCloudflareContext({ async: true });
+  const database = (env as D1Env).DB;
+  if (!database) {
+    throw new Error("Configure the DB D1 binding in Cloudflare.");
   }
 
-  if (!connectionString) {
-    throw new Error(
-      "Configure POSTGRES_URL locally or a Hyperdrive binding in Cloudflare."
-    );
-  }
-
-  const pool = new Pool({ connectionString, max: 1, maxUses: 1 });
-  return drizzle({
-    client: pool,
+  return drizzle(database as never, {
     schema: { studyAdminSetting, studyMessage, studySession, user },
   });
 });

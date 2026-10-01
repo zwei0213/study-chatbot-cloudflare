@@ -11,15 +11,14 @@
 
 默认不限制对话轮数。若另行设置 `STUDY_MAX_EXCHANGES`，达到轮数后停止发送消息，但仍须满 10 分钟才能手动结束。以时长为准的实验建议不设置该变量。
 
-升级已有项目时，先执行 `corepack pnpm db:migrate` 应用计时字段迁移，再启动网站。已有聊天记录会保留，旧会话以第一条已保存消息的时间作为开始时间；没有消息的会话等待参与者点击开始。
+本项目使用 Cloudflare D1（SQLite）保存会话。将旧版 PostgreSQL 数据库切换到 D1 不会自动复制历史记录；旧数据库不会被修改。
 
 ## 本地启动
 
-需要 Node.js 22、pnpm 和一个 PostgreSQL 数据库。复制 `.env.example` 为 `.env.local`，至少配置：
+需要 Node.js 22 和 pnpm。复制 `.env.example` 为 `.env.local`，至少配置：
 
 ```env
 AUTH_SECRET=请填写随机长字符串
-POSTGRES_URL=postgresql://用户名:密码@地址:5432/数据库名
 DEEPSEEK_API_KEY=请填写你的DeepSeekAPIKey
 STUDY_ADMIN_TOKEN=请填写独立的随机长字符串
 ```
@@ -29,20 +28,20 @@ STUDY_ADMIN_TOKEN=请填写独立的随机长字符串
 然后执行：
 
 ```powershell
-pnpm install --frozen-lockfile
-pnpm db:migrate
-pnpm dev
+corepack pnpm install --frozen-lockfile
+corepack pnpm db:migrate:local
+corepack pnpm dev
 ```
 
 打开 `http://localhost:3000/study/a` 和 `http://localhost:3000/study/b`。首次打开时项目会自动建立匿名访客身份，无需被试注册。一个浏览器身份在每个条件下对应一条持续会话；刷新页面会恢复聊天记录。正式实验应向每位被试只发其所属组的链接，并让不同被试使用各自的浏览器会话。
 
 ## Cloudflare Workers 部署
 
-本目录是独立迁移副本，基于 OpenNext for Cloudflare。部署前准备 Cloudflare 账号、GitHub 私有仓库、DeepSeek API Key，以及 PostgreSQL 数据库连接。推荐在 Cloudflare 控制台创建 Worker 并连接该私有 GitHub 仓库，构建命令设为 `pnpm install --frozen-lockfile && pnpm exec opennextjs-cloudflare build`，部署命令设为 `pnpm exec opennextjs-cloudflare deploy`。也可以在本地运行 `pnpm deploy`，首次使用 Wrangler 时按提示登录 Cloudflare。
+本目录是独立迁移副本，基于 OpenNext for Cloudflare。部署前准备 Cloudflare 账号、GitHub 私有仓库和 DeepSeek API Key。项目使用 D1 数据库 `study-chatbot-db`。Cloudflare Workers Builds 的构建命令应设置为 `pnpm install --frozen-lockfile`，部署命令设为 `pnpm run deploy`；部署脚本先应用 D1 迁移，再构建并发布 Worker。也可以在本地运行 `corepack pnpm deploy`，首次使用 Wrangler 时按提示登录 Cloudflare。
 
-在 Worker 设置中配置以下 Secrets：`AUTH_SECRET`、`STUDY_ADMIN_TOKEN`、`DEEPSEEK_API_KEY`。`STUDY_ADMIN_TOKEN` 至少 32 个字符。不要将密钥提交到 GitHub。数据库通过 Cloudflare Hyperdrive 连接：先创建 Hyperdrive 配置指向现有 PostgreSQL 数据库，再将 Cloudflare 给出的配置 ID 加到 `wrangler.jsonc` 顶层：`"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "你的 Hyperdrive 配置 ID" }]`。之后提交并推送，Worker 才会带着该数据库绑定部署。本地开发可在 `.dev.vars` 中配置 `POSTGRES_URL`（该文件不要提交）；Cloudflare 部署使用 Hyperdrive，不需要把数据库连接字符串写进仓库。
+在 Worker 设置中配置以下 Secrets：`AUTH_SECRET`、`STUDY_ADMIN_TOKEN`、`DEEPSEEK_API_KEY`。`STUDY_ADMIN_TOKEN` 至少 32 个字符。不要将密钥提交到 GitHub。创建名为 `study-chatbot-db` 的 D1 数据库后，将 Cloudflare 给出的数据库 ID 填入 `wrangler.jsonc` 的 `d1_databases` 配置并提交。D1 本地开发由 Wrangler 自动创建持久化的 SQLite 文件，不需要数据库 URL。
 
-首次部署前，使用本地安全环境中的 PostgreSQL 连接运行 `pnpm db:migrate`，确保数据库 schema 已升级。已有 PostgreSQL 数据可原样保留，Hyperdrive 指向同一个数据库即可；迁移不会复制或删除现有数据。Workers 免费套餐有用量限制，正式开放前请按 Cloudflare 控制台显示的当前额度评估访问量。
+首次部署后运行 `corepack pnpm db:migrate`，将 schema 应用到远程 D1。切换后新对话写入 D1；原 PostgreSQL 中的历史会话不会自动复制过来。D1 免费套餐有用量限制，正式开放前请按 Cloudflare 控制台显示的当前额度评估访问量。
 
 部署后将 `/study/a` 与 `/study/b` 的 HTTPS 链接分别发给两组被试。DeepSeek API Key 和管理员令牌只能作为 Worker Secret 保存。
 

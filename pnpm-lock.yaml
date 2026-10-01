@@ -26,6 +26,9 @@ importers:
       pg:
         specifier: ^8.23.1
         version: 8.23.1
+      pg-cloudflare:
+        specifier: ^1.4.1
+        version: 1.4.1
       postgres:
         specifier: ^3.4.9
         version: 3.4.9

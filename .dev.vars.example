@@ -1,0 +1,6 @@
+NEXTJS_ENV=development
+# Local PostgreSQL connection only. Never commit .dev.vars.
+POSTGRES_URL=postgresql://user:password@localhost:5432/study_chatbot
+AUTH_SECRET=replace-with-a-random-secret
+STUDY_ADMIN_TOKEN=replace-with-a-random-secret-of-at-least-32-characters
+DEEPSEEK_API_KEY=replace-with-your-deepseek-key

@@ -40,7 +40,7 @@ pnpm dev
 
 本目录是独立迁移副本，基于 OpenNext for Cloudflare。部署前准备 Cloudflare 账号、GitHub 私有仓库、DeepSeek API Key，以及 PostgreSQL 数据库连接。推荐在 Cloudflare 控制台创建 Worker 并连接该私有 GitHub 仓库，构建命令设为 `pnpm install --frozen-lockfile && pnpm exec opennextjs-cloudflare build`，部署命令设为 `pnpm exec opennextjs-cloudflare deploy`。也可以在本地运行 `pnpm deploy`，首次使用 Wrangler 时按提示登录 Cloudflare。
 
-在 Worker 设置中配置以下 Secrets：`AUTH_SECRET`、`STUDY_ADMIN_TOKEN`、`DEEPSEEK_API_KEY`。`STUDY_ADMIN_TOKEN` 至少 32 个字符。不要将密钥提交到 GitHub。数据库通过 Cloudflare Hyperdrive 连接：创建 Hyperdrive 配置指向现有 PostgreSQL 数据库，并将其绑定名称设为 `HYPERDRIVE`。本地开发可在 `.dev.vars` 中配置 `POSTGRES_URL`（该文件不要提交）；Cloudflare 部署使用 Hyperdrive，不需要把数据库连接字符串写进仓库。
+在 Worker 设置中配置以下 Secrets：`AUTH_SECRET`、`STUDY_ADMIN_TOKEN`、`DEEPSEEK_API_KEY`。`STUDY_ADMIN_TOKEN` 至少 32 个字符。不要将密钥提交到 GitHub。数据库通过 Cloudflare Hyperdrive 连接：先创建 Hyperdrive 配置指向现有 PostgreSQL 数据库，再将 Cloudflare 给出的配置 ID 加到 `wrangler.jsonc` 顶层：`"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "你的 Hyperdrive 配置 ID" }]`。之后提交并推送，Worker 才会带着该数据库绑定部署。本地开发可在 `.dev.vars` 中配置 `POSTGRES_URL`（该文件不要提交）；Cloudflare 部署使用 Hyperdrive，不需要把数据库连接字符串写进仓库。
 
 首次部署前，使用本地安全环境中的 PostgreSQL 连接运行 `pnpm db:migrate`，确保数据库 schema 已升级。已有 PostgreSQL 数据可原样保留，Hyperdrive 指向同一个数据库即可；迁移不会复制或删除现有数据。Workers 免费套餐有用量限制，正式开放前请按 Cloudflare 控制台显示的当前额度评估访问量。
 

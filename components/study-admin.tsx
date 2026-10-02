@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { ChatMessageText } from "@/components/chat-message-text";
 
 type AdminSession = {
   condition: "a" | "b";
@@ -789,9 +790,10 @@ export function StudyAdmin({
                           <span>{message.role === "user" ? "用户" : "AI"}</span>
                           <time>{formatDate(message.createdAt)}</time>
                         </div>
-                        <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                          {message.content}
-                        </p>
+                        <ChatMessageText
+                          className="text-sm leading-7"
+                          text={message.content}
+                        />
                       </article>
                     ))
                   )}

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ChatMessageText } from "@/components/chat-message-text";
 import type { StudyCondition } from "@/lib/study/study";
 import {
   getStudyElapsedSeconds,
@@ -29,22 +30,6 @@ type StudyTiming = {
   endedAt: string | null;
   serverNow: string;
 };
-
-function AssistantMessageText({ text }: { text: string }) {
-  const paragraphs = text
-    .split(/\r?\n(?:[ \t]*\r?\n)+/)
-    .filter((paragraph) => paragraph.trim().length > 0);
-
-  return (
-    <div className="space-y-2">
-      {paragraphs.map((paragraph, index) => (
-        <p className="whitespace-pre-wrap" key={index}>
-          {paragraph}
-        </p>
-      ))}
-    </div>
-  );
-}
 
 function formatTime(seconds: number) {
   return `${Math.floor(seconds / 60)
@@ -373,8 +358,8 @@ export function StudyChat({
       </header>
 
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-6">
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-7 whitespace-pre-line shadow-sm">
-          {welcome}
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <ChatMessageText className="text-sm leading-7" text={welcome} />
         </div>
 
         <section
@@ -413,23 +398,19 @@ export function StudyChat({
           ) : null}
           {messages.map((message) => (
             <div
-              className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 whitespace-pre-wrap ${
+              className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-7 ${
                 message.role === "user"
                   ? "ml-auto bg-slate-800 text-white"
                   : "mr-auto border border-slate-200 bg-white text-slate-900"
               }`}
               key={message.id}
             >
-              {message.role === "assistant" ? (
-                <AssistantMessageText text={message.content} />
-              ) : (
-                message.content
-              )}
+              <ChatMessageText text={message.content} />
             </div>
           ))}
           {pendingUserText ? (
-            <div className="ml-auto max-w-[88%] rounded-2xl bg-slate-800 px-4 py-3 text-sm leading-7 whitespace-pre-wrap text-white">
-              {pendingUserText}
+            <div className="ml-auto max-w-[88%] rounded-2xl bg-slate-800 px-4 py-3 text-sm leading-7 text-white">
+              <ChatMessageText text={pendingUserText} />
             </div>
           ) : null}
           {sending && !streamingText ? (
@@ -439,7 +420,7 @@ export function StudyChat({
           ) : null}
           {streamingText ? (
             <div className="mr-auto max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900">
-              <AssistantMessageText text={streamingText} />
+              <ChatMessageText text={streamingText} />
               <span aria-hidden="true" className="animate-pulse">
                 ▍
               </span>

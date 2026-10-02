@@ -30,6 +30,22 @@ type StudyTiming = {
   serverNow: string;
 };
 
+function AssistantMessageText({ text }: { text: string }) {
+  const paragraphs = text
+    .split(/\r?\n(?:[ \t]*\r?\n)+/)
+    .filter((paragraph) => paragraph.trim().length > 0);
+
+  return (
+    <div className="space-y-2">
+      {paragraphs.map((paragraph, index) => (
+        <p className="whitespace-pre-wrap" key={index}>
+          {paragraph}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function formatTime(seconds: number) {
   return `${Math.floor(seconds / 60)
     .toString()
@@ -404,7 +420,11 @@ export function StudyChat({
               }`}
               key={message.id}
             >
-              {message.content}
+              {message.role === "assistant" ? (
+                <AssistantMessageText text={message.content} />
+              ) : (
+                message.content
+              )}
             </div>
           ))}
           {pendingUserText ? (
@@ -418,8 +438,8 @@ export function StudyChat({
             </p>
           ) : null}
           {streamingText ? (
-            <div className="mr-auto max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 whitespace-pre-wrap text-slate-900">
-              {streamingText}
+            <div className="mr-auto max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900">
+              <AssistantMessageText text={streamingText} />
               <span aria-hidden="true" className="animate-pulse">
                 ▍
               </span>

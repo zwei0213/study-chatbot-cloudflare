@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
-import { checkIpRateLimit } from "@/lib/ratelimit";
+import { checkIpRateLimit, RateLimitError } from "@/lib/ratelimit";
 import { getStudyApiKey } from "@/lib/study/admin";
 import {
   getStudyMessages,
@@ -9,6 +9,7 @@ import {
 } from "@/lib/study/queries";
 import { getStudyMaxExchanges } from "@/lib/study/study";
 import { StudySessionError } from "@/lib/study/timing";
+import { readModelStream } from "@/lib/study/upstream";
 
 export const maxDuration = 60;
 
@@ -18,48 +19,34 @@ const requestSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
-  }
-
-  const parsed = requestSchema.safeParse(
-    await request.json().catch(() => null)
-  );
-  if (!parsed.success) {
-    return Response.json(
-      { error: "消息格式无效或超过 2000 字。" },
-      { status: 400 }
-    );
-  }
-
-  let apiKey: string | null;
   try {
-    apiKey = await getStudyApiKey();
-  } catch (error) {
-    console.error("Study API key unavailable:", error);
-    return Response.json(
-      { error: "管理员保存的 API Key 无法读取，请在后台重新保存。" },
-      { status: 503 }
-    );
-  }
-  if (!apiKey) {
-    return Response.json(
-      { error: "管理员尚未配置模型 API Key。" },
-      { status: 503 }
-    );
-  }
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
+    }
 
-  try {
-    await checkIpRateLimit(request, "chat");
-  } catch {
-    return Response.json(
-      { error: "发送过于频繁，请稍后再试。" },
-      { status: 429 }
+    const parsed = requestSchema.safeParse(
+      await request.json().catch(() => null)
     );
-  }
+    if (!parsed.success) {
+      return Response.json(
+        { error: "消息格式无效或超过 2000 字。" },
+        { status: 400 }
+      );
+    }
 
-  try {
+    try {
+      await checkIpRateLimit(request, "chat");
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        return Response.json(
+          { error: "发送过于频繁，请稍后再试。" },
+          { status: 429 }
+        );
+      }
+      throw error;
+    }
+
     const studySession = await getStudySession(parsed.data.participantId);
     if (!studySession || studySession.userId !== session.user.id) {
       return Response.json({ error: "无权访问该对话。" }, { status: 403 });
@@ -68,6 +55,23 @@ export async function POST(request: Request) {
       return Response.json(
         { error: "本次对话尚未开始或已经结束，请刷新页面。" },
         { status: 409 }
+      );
+    }
+
+    let apiKey: string | null;
+    try {
+      apiKey = await getStudyApiKey();
+    } catch (error) {
+      console.error("Study API key unavailable:", error);
+      return Response.json(
+        { error: "管理员保存的 API Key 无法读取，请在后台重新保存。" },
+        { status: 503 }
+      );
+    }
+    if (!apiKey) {
+      return Response.json(
+        { error: "管理员尚未配置模型 API Key。" },
+        { status: 503 }
       );
     }
 
@@ -82,6 +86,7 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
+    const upstreamAbort = new AbortController();
     const response = await fetch("https://api.deepseek.com/chat/completions", {
       body: JSON.stringify({
         messages: [
@@ -97,10 +102,15 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       method: "POST",
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.any([
+        request.signal,
+        upstreamAbort.signal,
+        AbortSignal.timeout(55_000),
+      ]),
     });
 
     if (!response.ok) {
+      response.body?.cancel().catch(() => undefined);
       console.error("DeepSeek request failed with status", response.status);
       return Response.json(
         { error: "AI 暂时无法回复，请稍后重试。" },
@@ -117,9 +127,17 @@ export async function POST(request: Request) {
     }
 
     const encoder = new TextEncoder();
+    let disconnected = false;
     const stream = new ReadableStream<Uint8Array>({
+      cancel() {
+        disconnected = true;
+        upstreamAbort.abort();
+      },
       async start(controller) {
         const send = (event: Record<string, unknown>) => {
+          if (disconnected) {
+            return;
+          }
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
           );
@@ -127,62 +145,11 @@ export async function POST(request: Request) {
 
         let answer = "";
         try {
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let modelFinished = false;
-
-          const handleEvent = (rawEvent: string) => {
-            const data = rawEvent
-              .split("\n")
-              .filter((line) => line.startsWith("data:"))
-              .map((line) => line.slice(5).trimStart())
-              .join("\n");
-
-            if (!data) {
-              return;
-            }
-            if (data === "[DONE]") {
-              modelFinished = true;
-              return;
-            }
-
-            const chunk = JSON.parse(data);
-            const text = chunk?.choices?.[0]?.delta?.content;
-            if (typeof text === "string" && text.length > 0) {
-              answer += text;
-              send({ text, type: "delta" });
-            }
-          };
-
-          const handleChunk = (chunk: Uint8Array) => {
-            if (modelFinished) {
-              return;
-            }
-            buffer += decoder.decode(chunk, { stream: true });
-            buffer = buffer.replace(/\r\n/g, "\n");
-
-            let boundary = buffer.indexOf("\n\n");
-            while (boundary !== -1) {
-              handleEvent(buffer.slice(0, boundary));
-              buffer = buffer.slice(boundary + 2);
-              if (modelFinished) {
-                break;
-              }
-              boundary = buffer.indexOf("\n\n");
-            }
-          };
-
-          await upstreamBody.pipeTo(
-            new WritableStream<Uint8Array>({ write: handleChunk })
-          );
-
-          buffer += decoder.decode();
-          buffer = buffer.replace(/\r\n/g, "\n");
-          if (buffer.trim() && !modelFinished) {
-            handleEvent(buffer);
-          }
-          if (!modelFinished) {
-            send({ error: "AI 回复连接中断，请重试。", type: "error" });
+          await readModelStream(upstreamBody, (text) => {
+            answer += text;
+            send({ text, type: "delta" });
+          });
+          if (disconnected) {
             return;
           }
 
@@ -199,10 +166,20 @@ export async function POST(request: Request) {
           );
           send({ messages, type: "done" });
         } catch (error) {
-          console.error("Study chat stream failed:", error);
-          send({ error: "AI 暂时无法回复，请稍后重试。", type: "error" });
+          if (!disconnected) {
+            console.error("Study chat stream failed:", error);
+            send({
+              error:
+                error instanceof StudySessionError
+                  ? error.message
+                  : "AI 回复中断或保存失败，请稍后重试。",
+              type: "error",
+            });
+          }
         } finally {
-          controller.close();
+          if (!disconnected) {
+            controller.close();
+          }
         }
       },
     });

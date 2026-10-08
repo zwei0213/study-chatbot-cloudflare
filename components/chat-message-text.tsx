@@ -12,6 +12,7 @@ export function ChatMessageText({
   return (
     <div className={`space-y-2 break-words ${className}`}>
       {paragraphs.map((paragraph, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: Streaming updates append paragraphs without reordering them.
         <p className="whitespace-pre-wrap" key={index}>
           {paragraph}
         </p>

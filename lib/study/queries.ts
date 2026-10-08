@@ -28,7 +28,16 @@ export async function getOrCreateStudySession(
   condition: StudyCondition
 ) {
   const db = await getDb();
-  await db
+  const where = and(
+    eq(studySession.userId, userId),
+    eq(studySession.condition, condition)
+  );
+  const [existing] = await db.select().from(studySession).where(where).limit(1);
+  if (existing) {
+    return existing;
+  }
+
+  const [created] = await db
     .insert(studySession)
     .values({
       condition,
@@ -37,18 +46,14 @@ export async function getOrCreateStudySession(
       systemPrompt: getStudyPrompt(condition),
       userId,
     })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning();
+  if (created) {
+    return created;
+  }
 
-  const [session] = await db
-    .select()
-    .from(studySession)
-    .where(
-      and(
-        eq(studySession.userId, userId),
-        eq(studySession.condition, condition)
-      )
-    )
-    .limit(1);
+  // Another tab may have created the same participant session concurrently.
+  const [session] = await db.select().from(studySession).where(where).limit(1);
 
   if (!session) {
     throw new Error("Unable to create study session");
@@ -139,7 +144,10 @@ export async function saveStudyExchange(
 ) {
   const db = await getDb();
   const [session] = await db
-    .select({ endedAt: studySession.endedAt, startedAt: studySession.startedAt })
+    .select({
+      endedAt: studySession.endedAt,
+      startedAt: studySession.startedAt,
+    })
     .from(studySession)
     .where(eq(studySession.id, sessionId))
     .limit(1);
@@ -152,32 +160,32 @@ export async function saveStudyExchange(
   const assistantMessageId = randomUUID();
   const nextSequence = sql<number>`COALESCE((SELECT MAX(${studyMessage.sequence}) FROM ${studyMessage} WHERE ${studyMessage.sessionId} = ${sessionId}), 0) + 1`;
 
-  await db.batch([
-    db.insert(studyMessage).values({
-      content: userText,
-      createdAt,
-      id: userMessageId,
-      role: "user",
-      sequence: nextSequence,
-      sessionId,
-    }),
-    db.insert(studyMessage).values({
-      content: assistantText,
-      createdAt,
-      id: assistantMessageId,
-      role: "assistant",
-      sequence: nextSequence,
-      sessionId,
-    }),
+  const [userMessages, assistantMessages] = await db.batch([
+    db
+      .insert(studyMessage)
+      .values({
+        content: userText,
+        createdAt,
+        id: userMessageId,
+        role: "user",
+        sequence: nextSequence,
+        sessionId,
+      })
+      .returning(),
+    db
+      .insert(studyMessage)
+      .values({
+        content: assistantText,
+        createdAt,
+        id: assistantMessageId,
+        role: "assistant",
+        sequence: nextSequence,
+        sessionId,
+      })
+      .returning(),
   ]);
 
-  const savedMessages = await db
-    .select()
-    .from(studyMessage)
-    .where(
-      or(eq(studyMessage.id, userMessageId), eq(studyMessage.id, assistantMessageId))
-    )
-    .orderBy(asc(studyMessage.sequence));
+  const savedMessages = [...userMessages, ...assistantMessages];
   if (savedMessages.length !== 2) {
     throw new Error("Unable to save the complete study exchange");
   }
@@ -223,12 +231,13 @@ export async function listStudyAdminSessions({
   }
   if (query) {
     const pattern = `%${query.toLowerCase()}%`;
-    filters.push(
-      or(
-        like(sql`lower(${studySession.id})`, pattern),
-        like(sql`lower(${studySession.userId})`, pattern)
-      )!
+    const queryFilter = or(
+      like(sql`lower(${studySession.id})`, pattern),
+      like(sql`lower(${studySession.userId})`, pattern)
     );
+    if (queryFilter) {
+      filters.push(queryFilter);
+    }
   }
   const where = filters.length > 0 ? and(...filters) : undefined;
   const db = await getDb();
@@ -242,23 +251,16 @@ export async function listStudyAdminSessions({
       createdAt: studySession.createdAt,
       endedAt: studySession.endedAt,
       id: studySession.id,
-      messageCount: sql<number>`count(${studyMessage.id})`,
+      messageCount: sql<number>`(${db
+        .select({ value: count() })
+        .from(studyMessage)
+        .where(eq(studyMessage.sessionId, studySession.id))})`,
       model: studySession.model,
       startedAt: studySession.startedAt,
       userId: studySession.userId,
     })
     .from(studySession)
-    .leftJoin(studyMessage, eq(studyMessage.sessionId, studySession.id))
     .where(where)
-    .groupBy(
-      studySession.id,
-      studySession.condition,
-      studySession.createdAt,
-      studySession.endedAt,
-      studySession.model,
-      studySession.startedAt,
-      studySession.userId
-    )
     .orderBy(desc(studySession.createdAt))
     .limit(pageSize)
     .offset((page - 1) * pageSize);

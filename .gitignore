@@ -31,5 +31,6 @@ yarn-error.log*
 /playwright/*
 /.playwright-cli/
 /output/playwright/
+/diagnostics/
 next-env.d.ts
 tsconfig.tsbuildinfo

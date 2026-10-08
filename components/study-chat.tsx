@@ -9,6 +9,11 @@ import {
   useState,
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
+import {
+  getStudyErrorMessage,
+  readStudyChatStream,
+  readStudyJson,
+} from "@/lib/study/client";
 import type { StudyCondition } from "@/lib/study/study";
 import {
   getStudyElapsedSeconds,
@@ -29,6 +34,12 @@ type StudyTiming = {
   startedAt: string | null;
   endedAt: string | null;
   serverNow: string;
+};
+
+type StudySessionResponse = StudyTiming & {
+  participantId: string;
+  maxExchanges: number | null;
+  messages: StudyMessage[];
 };
 
 function formatTime(seconds: number) {
@@ -111,8 +122,13 @@ export function StudyChat({
   useEffect(() => {
     let active = true;
     let refreshing = false;
+    let complete = false;
+    const controller = new AbortController();
     async function loadSession(initial = false) {
-      if (refreshing) {
+      if (
+        refreshing ||
+        (!initial && (complete || document.visibilityState !== "visible"))
+      ) {
         return;
       }
       refreshing = true;
@@ -122,12 +138,11 @@ export function StudyChat({
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
           method: "POST",
+          signal: controller.signal,
         });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error ?? "加载对话失败。");
-        }
+        const data = await readStudyJson<StudySessionResponse>(response);
         if (active) {
+          complete = data.endedAt !== null;
           setParticipantId(data.participantId);
           setMaxExchanges(data.maxExchanges);
           mergeMessages(data.messages);
@@ -135,7 +150,10 @@ export function StudyChat({
         }
       } catch (cause) {
         if (active && initial) {
-          setError(cause instanceof Error ? cause.message : "加载对话失败。");
+          console.error("Study session load failed:", cause);
+          setError(
+            getStudyErrorMessage(cause, "加载对话失败，请稍后刷新页面。")
+          );
         }
       } finally {
         refreshing = false;
@@ -145,7 +163,7 @@ export function StudyChat({
       }
     }
     loadSession(true);
-    const poll = window.setInterval(() => loadSession(), 15_000);
+    const poll = window.setInterval(() => loadSession(), 60_000);
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
         loadSession();
@@ -154,6 +172,7 @@ export function StudyChat({
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(poll);
       document.removeEventListener("visibilitychange", onVisibility);
     };
@@ -187,14 +206,12 @@ export function StudyChat({
           headers: { "Content-Type": "application/json" },
           method: "PATCH",
         });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error ?? "保存失败，请重试。");
-        }
+        const data = await readStudyJson<StudyTiming>(response);
         syncTiming(data);
         setConfirmEnd(false);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "保存失败，请重试。");
+        console.error("Study session update failed:", cause);
+        setError(getStudyErrorMessage(cause, "保存失败，请重试。"));
       } finally {
         setUpdating(false);
       }
@@ -229,84 +246,25 @@ export function StudyChat({
     setStreamingText("");
     setPendingUserText(text);
     setInput("");
-    let completed = false;
     try {
       const response = await fetch("/api/study/chat", {
         body: JSON.stringify({ participantId, text }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error ?? "发送失败，请重试。");
-      }
-      if (!response.body) {
-        throw new Error("无法读取 AI 回复，请重试。");
-      }
-
-      const responseBody = response.body;
-      if (!responseBody) {
-        throw new Error("无法读取 AI 回复，请重试。");
-      }
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      const handleEvent = (rawEvent: string) => {
-        const data = rawEvent
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n");
-        if (!data) {
-          return;
-        }
-
-        const event = JSON.parse(data) as {
-          error?: string;
-          messages?: StudyMessage[];
-          text?: string;
-          type?: string;
-        };
-        if (event.type === "delta" && typeof event.text === "string") {
+      await readStudyChatStream<StudyMessage>(response, (event) => {
+        if (event.type === "delta") {
           setStreamingText((current) => current + event.text);
-        } else if (event.type === "done" && event.messages) {
+        } else if (event.type === "done") {
           mergeMessages(event.messages);
           setPendingUserText("");
-          completed = true;
-        } else if (event.type === "error") {
-          throw new Error(event.error ?? "发送失败，请重试。");
         }
-      };
-
-      const handleChunk = (chunk: Uint8Array) => {
-        buffer += decoder.decode(chunk, { stream: true });
-        buffer = buffer.replace(/\r\n/g, "\n");
-
-        let boundary = buffer.indexOf("\n\n");
-        while (boundary !== -1) {
-          handleEvent(buffer.slice(0, boundary));
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf("\n\n");
-        }
-      };
-
-      await responseBody.pipeTo(
-        new WritableStream<Uint8Array>({ write: handleChunk })
-      );
-
-      buffer += decoder.decode();
-      buffer = buffer.replace(/\r\n/g, "\n");
-      if (buffer.trim()) {
-        handleEvent(buffer);
-      }
-
-      if (!completed) {
-        throw new Error("AI 回复连接中断，请重试。");
-      }
+      });
     } catch (cause) {
+      console.error("Study chat request failed:", cause);
       setPendingUserText("");
       setInput((current) => current || text);
-      setError(cause instanceof Error ? cause.message : "发送失败，请重试。");
+      setError(getStudyErrorMessage(cause, "发送失败，请检查网络并稍后重试。"));
     } finally {
       setStreamingText("");
       setSending(false);

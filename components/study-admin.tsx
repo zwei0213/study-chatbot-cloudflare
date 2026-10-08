@@ -7,9 +7,11 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
+import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
 
 type AdminSession = {
   condition: "a" | "b";
@@ -56,13 +58,6 @@ function shortId(value: string) {
   return `${value.slice(0, 8)}…${value.slice(-4)}`;
 }
 
-async function readError(response: Response, fallback: string) {
-  const data = (await response.json().catch(() => null)) as {
-    error?: string;
-  } | null;
-  return data?.error ?? fallback;
-}
-
 export function StudyAdmin({
   initialAuthenticated,
 }: {
@@ -91,6 +86,8 @@ export function StudyAdmin({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const listRequestRef = useRef<AbortController | null>(null);
+  const keyRequestRef = useRef<AbortController | null>(null);
 
   const lastPage = Math.max(1, Math.ceil(total / 20));
   const selectedSession = useMemo(
@@ -100,6 +97,9 @@ export function StudyAdmin({
 
   const loadSessions = useCallback(
     async (nextPage: number, nextCondition: string, nextQuery: string) => {
+      listRequestRef.current?.abort();
+      const controller = new AbortController();
+      listRequestRef.current = controller;
       setListBusy(true);
       setError("");
       try {
@@ -112,34 +112,45 @@ export function StudyAdmin({
         }
         const response = await fetch(`/api/admin/study-sessions?${params}`, {
           cache: "no-store",
+          signal: controller.signal,
         });
-        if (!response.ok) {
-          throw new Error(await readError(response, "读取历史记录失败。"));
+        const data = await readStudyJson<SessionPage>(response);
+        if (controller.signal.aborted) {
+          return;
         }
-        const data = (await response.json()) as SessionPage;
         setSessions(data.sessions);
         setTotal(data.total);
         setPage(data.page);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "读取历史记录失败。");
+        if (!controller.signal.aborted) {
+          setError(getStudyErrorMessage(cause, "读取历史记录失败。"));
+        }
       } finally {
-        setListBusy(false);
+        if (listRequestRef.current === controller) {
+          setListBusy(false);
+        }
       }
     },
     []
   );
 
   const loadKeyStatus = useCallback(async () => {
+    keyRequestRef.current?.abort();
+    const controller = new AbortController();
+    keyRequestRef.current = controller;
     try {
-      const response = await fetch("/api/admin/api-key", { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(await readError(response, "无法读取 API Key 状态。"));
+      const response = await fetch("/api/admin/api-key", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const data = await readStudyJson<ApiKeyStatus>(response);
+      if (!controller.signal.aborted) {
+        setKeyStatus(data);
       }
-      setKeyStatus((await response.json()) as ApiKeyStatus);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "无法读取 API Key 状态。"
-      );
+      if (!controller.signal.aborted) {
+        setError(getStudyErrorMessage(cause, "无法读取 API Key 状态。"));
+      }
     }
   }, []);
 
@@ -176,8 +187,16 @@ export function StudyAdmin({
       return;
     }
     loadSessions(1, condition, query);
+    return () => listRequestRef.current?.abort();
+  }, [authenticated, condition, loadSessions, query]);
+
+  useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
     loadKeyStatus();
-  }, [authenticated, condition, loadKeyStatus, loadSessions, query]);
+    return () => keyRequestRef.current?.abort();
+  }, [authenticated, loadKeyStatus]);
 
   useEffect(() => {
     if (!sessions.length) {
@@ -196,18 +215,15 @@ export function StudyAdmin({
       return;
     }
     let active = true;
+    const controller = new AbortController();
+    setDetail(null);
     setDetailBusy(true);
     setError("");
     fetch(
       `/api/admin/study-sessions?sessionId=${encodeURIComponent(selectedId)}`,
-      { cache: "no-store" }
+      { cache: "no-store", signal: controller.signal }
     )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readError(response, "读取对话详情失败。"));
-        }
-        return (await response.json()) as AdminSessionDetail;
-      })
+      .then(async (response) => readStudyJson<AdminSessionDetail>(response))
       .then((data) => {
         if (active) {
           setDetail(data);
@@ -215,9 +231,7 @@ export function StudyAdmin({
       })
       .catch((cause: unknown) => {
         if (active) {
-          setError(
-            cause instanceof Error ? cause.message : "读取对话详情失败。"
-          );
+          setError(getStudyErrorMessage(cause, "读取对话详情失败。"));
         }
       })
       .finally(() => {
@@ -227,6 +241,7 @@ export function StudyAdmin({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [authenticated, selectedId]);
 
@@ -241,13 +256,11 @@ export function StudyAdmin({
           headers: { "Content-Type": "application/json" },
           method: "POST",
         });
-        if (!response.ok) {
-          throw new Error(await readError(response, "管理员登录失败。"));
-        }
+        await readStudyJson(response);
         setToken("");
         setAuthenticated(true);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "管理员登录失败。");
+        setError(getStudyErrorMessage(cause, "管理员登录失败。"));
       } finally {
         setLoginBusy(false);
       }
@@ -256,13 +269,22 @@ export function StudyAdmin({
   );
 
   const handleLogout = useCallback(async () => {
-    await fetch("/api/admin/logout", { method: "POST" }).catch(() => undefined);
-    setAuthenticated(false);
-    setSessions([]);
-    setSelectedId(null);
-    setDetail(null);
-    setKeyStatus(null);
-    setNotice("");
+    try {
+      const response = await fetch("/api/admin/logout", { method: "POST" });
+      await readStudyJson(response);
+      listRequestRef.current?.abort();
+      keyRequestRef.current?.abort();
+      setAuthenticated(false);
+      setSessions([]);
+      setSelectedId(null);
+      setDetail(null);
+      setKeyStatus(null);
+      setApiKey("");
+      setError("");
+      setNotice("");
+    } catch (cause) {
+      setError(getStudyErrorMessage(cause, "退出失败，请重试。"));
+    }
   }, []);
 
   const handleSaveApiKey = useCallback(
@@ -272,6 +294,7 @@ export function StudyAdmin({
         setError("请输入新的 DeepSeek API Key。");
         return;
       }
+      keyRequestRef.current?.abort();
       setKeyBusy(true);
       setError("");
       setNotice("");
@@ -281,16 +304,11 @@ export function StudyAdmin({
           headers: { "Content-Type": "application/json" },
           method: "PUT",
         });
-        if (!response.ok) {
-          throw new Error(await readError(response, "保存 API Key 失败。"));
-        }
-        setKeyStatus((await response.json()) as ApiKeyStatus);
+        setKeyStatus(await readStudyJson<ApiKeyStatus>(response));
         setApiKey("");
-        setNotice("DeepSeek API Key 已加密保存；后续新对话将使用新 Key。");
+        setNotice("DeepSeek API Key 已加密保存；后续发送消息将使用新 Key。");
       } catch (cause) {
-        setError(
-          cause instanceof Error ? cause.message : "保存 API Key 失败。"
-        );
+        setError(getStudyErrorMessage(cause, "保存 API Key 失败。"));
       } finally {
         setKeyBusy(false);
       }
@@ -326,9 +344,7 @@ export function StudyAdmin({
         `/api/admin/study-sessions?sessionId=${encodeURIComponent(sessionId)}`,
         { method: "DELETE" }
       );
-      if (!response.ok) {
-        throw new Error(await readError(response, "删除会话失败。"));
-      }
+      await readStudyJson(response);
 
       const nextPage = sessions.length === 1 && page > 1 ? page - 1 : page;
       if (selectedId === sessionId) {
@@ -338,7 +354,7 @@ export function StudyAdmin({
       await loadSessions(nextPage, condition, query);
       setNotice("会话及其中的消息已删除。");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "删除会话失败。");
+      setError(getStudyErrorMessage(cause, "删除会话失败。"));
     } finally {
       setDeleteBusy(false);
     }
@@ -353,25 +369,19 @@ export function StudyAdmin({
   ]);
 
   const handleResetApiKey = useCallback(async () => {
+    keyRequestRef.current?.abort();
     setKeyBusy(true);
     setError("");
     setNotice("");
     try {
       const response = await fetch("/api/admin/api-key", { method: "DELETE" });
-      if (!response.ok) {
-        throw new Error(
-          await readError(response, "恢复环境变量 API Key 失败。")
-        );
-      }
-      setKeyStatus((await response.json()) as ApiKeyStatus);
+      setKeyStatus(await readStudyJson<ApiKeyStatus>(response));
       setNotice(
         "已移除后台覆盖值；现在使用 Cloudflare Worker Secret 中的 Key。"
       );
       setConfirmKeyReset(false);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "恢复环境变量 API Key 失败。"
-      );
+      setError(getStudyErrorMessage(cause, "恢复环境变量 API Key 失败。"));
     } finally {
       setKeyBusy(false);
     }
@@ -459,6 +469,7 @@ export function StudyAdmin({
           </div>
           <button
             className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            disabled={keyBusy || deleteBusy}
             onClick={handleLogout}
             type="button"
           >

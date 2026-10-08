@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkIpRateLimit } from "@/lib/ratelimit";
+import { checkIpRateLimit, RateLimitError } from "@/lib/ratelimit";
 import {
   getStudyAdminCookieValue,
   isStudyAdminTokenConfigured,
@@ -20,7 +20,14 @@ export async function POST(request: Request) {
 
   try {
     await checkIpRateLimit(request, "admin");
-  } catch {
+  } catch (error) {
+    if (!(error instanceof RateLimitError)) {
+      console.error("Study admin rate limiter unavailable:", error);
+      return NextResponse.json(
+        { error: "暂时无法登录，请稍后重试。" },
+        { status: 503 }
+      );
+    }
     return NextResponse.json(
       { error: "尝试次数过多，请稍后再试。" },
       { status: 429 }
@@ -31,7 +38,7 @@ export async function POST(request: Request) {
     token?: unknown;
   } | null;
   const token = typeof body?.token === "string" ? body.token : "";
-  if (!verifyStudyAdminToken(token)) {
+  if (token.length > 512 || !verifyStudyAdminToken(token)) {
     return NextResponse.json({ error: "管理员密钥无效。" }, { status: 401 });
   }
 

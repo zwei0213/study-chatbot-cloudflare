@@ -1,18 +1,12 @@
-import { timingSafeEqual } from "node:crypto";
+import { verifyStudyAdminToken } from "@/lib/study/admin";
 import { getStudyExportRows } from "@/lib/study/queries";
 import { getStudyElapsedSeconds } from "@/lib/study/timing";
 
 function authorized(request: Request) {
-  const secret = process.env.STUDY_ADMIN_TOKEN;
   const supplied = request.headers
     .get("authorization")
     ?.replace(/^Bearer /i, "");
-  if (!secret || !supplied) {
-    return false;
-  }
-  const expected = Buffer.from(secret);
-  const actual = Buffer.from(supplied);
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  return Boolean(supplied && verifyStudyAdminToken(supplied));
 }
 
 function csv(value: string) {

@@ -2,7 +2,7 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import { createGuestUser } from "@/lib/db/users";
-import { authConfig } from "./auth.config";
+import { checkIpRateLimit } from "@/lib/ratelimit";
 
 export type UserType = "guest";
 
@@ -33,7 +33,7 @@ export const {
   auth,
   signIn,
 } = NextAuth({
-  ...authConfig,
+  basePath: "/api/auth",
   callbacks: {
     jwt({ token, user }) {
       if (user) {
@@ -50,9 +50,14 @@ export const {
       return session;
     },
   },
+  pages: {
+    newUser: "/",
+    signIn: "/",
+  },
   providers: [
     Credentials({
-      async authorize() {
+      async authorize(_credentials, request) {
+        await checkIpRateLimit(request, "chat");
         const [guestUser] = await createGuestUser();
         return { ...guestUser, type: "guest" };
       },
@@ -60,4 +65,5 @@ export const {
       id: "guest",
     }),
   ],
+  trustHost: true,
 });

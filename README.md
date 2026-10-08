@@ -6,7 +6,7 @@
 
 - `/study/a` 和 `/study/b`：两种实验条件下的流式 AI 对话。
 - `/admin`：查看、删除会话记录，并设置 DeepSeek API Key。
-- `lib/study/prompts.json`：配置两组实验提示词。
+- `lib/study/prompts.json`：配置共同提示词、A/B 条件提示词和独立的回复字数提示词。
 
 ## 部署到 Cloudflare Workers
 
@@ -67,7 +67,7 @@
 
 ## 本地开发
 
-需要 Node.js 和 pnpm。复制 `.dev.vars.example` 为 `.dev.vars`，填入本地使用的密钥，然后运行：
+需要 Node.js 22.13 或更新版本和 pnpm。复制 `.dev.vars.example` 为 `.dev.vars`，填入本地使用的密钥，然后运行：
 
 ```sh
 pnpm install

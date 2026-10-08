@@ -11,19 +11,19 @@ import { StudySessionError } from "@/lib/study/timing";
 const requestSchema = z.object({ condition: z.enum(["a", "b"]) });
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
-  }
-
-  const parsed = requestSchema.safeParse(
-    await request.json().catch(() => null)
-  );
-  if (!parsed.success) {
-    return Response.json({ error: "实验链接无效。" }, { status: 400 });
-  }
-
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
+    }
+
+    const parsed = requestSchema.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
+      return Response.json({ error: "实验链接无效。" }, { status: 400 });
+    }
+
     const studySession = await getOrCreateStudySession(
       session.user.id,
       parsed.data.condition
@@ -45,7 +45,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Unable to start study session:", error);
-    return Response.json({ error: "暂时无法连接数据库。" }, { status: 503 });
+    return Response.json(
+      { error: "暂时无法加载对话，请稍后刷新页面。" },
+      { status: 503 }
+    );
   }
 }
 
@@ -55,15 +58,17 @@ const updateSchema = z.object({
 });
 
 export async function PATCH(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
-  }
-  const parsed = updateSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return Response.json({ error: "无效的对话操作。" }, { status: 400 });
-  }
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "请刷新页面后重试。" }, { status: 401 });
+    }
+    const parsed = updateSchema.safeParse(
+      await request.json().catch(() => null)
+    );
+    if (!parsed.success) {
+      return Response.json({ error: "无效的对话操作。" }, { status: 400 });
+    }
     const updated = await updateStudySession(
       parsed.data.participantId,
       session.user.id,

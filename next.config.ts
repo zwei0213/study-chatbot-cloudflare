@@ -1,5 +1,6 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -19,6 +20,9 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 };
 
-initOpenNextCloudflareForDev();
-
-export default nextConfig;
+export default function configureNext(phase: string): NextConfig {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    initOpenNextCloudflareForDev();
+  }
+  return nextConfig;
+}

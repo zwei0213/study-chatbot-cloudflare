@@ -1,5 +1,6 @@
-import { sql, type InferSelectModel } from "drizzle-orm";
+import { type InferSelectModel, sql } from "drizzle-orm";
 import {
+  index,
   integer,
   sqliteTable,
   text,
@@ -12,22 +13,9 @@ const createdAt = (name = "createdAt") =>
     .default(sql`(unixepoch() * 1000)`);
 
 export const user = sqliteTable("User", {
-  createdAt: createdAt(),
   email: text("email").notNull(),
-  emailVerified: integer("emailVerified", { mode: "boolean" })
-    .notNull()
-    .default(false),
   id: text("id").primaryKey().notNull(),
-  image: text("image"),
-  isAnonymous: integer("isAnonymous", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  name: text("name"),
-  password: text("password"),
-  updatedAt: createdAt("updatedAt"),
 });
-
-export type User = InferSelectModel<typeof user>;
 
 export const studySession = sqliteTable(
   "StudySession",
@@ -44,6 +32,7 @@ export const studySession = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
   },
   (table) => ({
+    createdAtIndex: index("StudySession_createdAt_idx").on(table.createdAt),
     participantCondition: uniqueIndex("StudySession_user_condition_idx").on(
       table.userId,
       table.condition

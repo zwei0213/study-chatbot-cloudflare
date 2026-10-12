@@ -1,17 +1,18 @@
 import prompts from "./prompts.json";
 
-export type StudyCondition = "a" | "b";
+export const STUDY_CONDITIONS = ["a", "b", "c"] as const;
+
+export type StudyCondition = (typeof STUDY_CONDITIONS)[number];
 
 export const STUDY_MODEL = "deepseek-flash";
 
 export function isStudyCondition(value: string): value is StudyCondition {
-  return value === "a" || value === "b";
+  return STUDY_CONDITIONS.some((condition) => condition === value);
 }
 
 export function getStudyPrompt(condition: StudyCondition) {
-  return [prompts.common, prompts[condition], prompts.responseLength].join(
-    "\n\n"
-  );
+  const conditionPrompt = prompts[condition === "c" ? "b" : condition];
+  return [prompts.common, conditionPrompt, prompts.responseLength].join("\n\n");
 }
 
 export const studyWelcome = prompts.welcome;

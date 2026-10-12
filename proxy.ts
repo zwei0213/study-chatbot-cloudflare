@@ -33,5 +33,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // API handlers verify their own sessions and return JSON errors.
-  matcher: ["/study/a", "/study/b"],
+  matcher: ["/study/a", "/study/b", "/study/c"],
 };

@@ -20,7 +20,7 @@ export const user = sqliteTable("User", {
 export const studySession = sqliteTable(
   "StudySession",
   {
-    condition: text("condition", { enum: ["a", "b"] }).notNull(),
+    condition: text("condition", { enum: ["a", "b", "c"] }).notNull(),
     createdAt: createdAt(),
     endedAt: integer("endedAt", { mode: "timestamp_ms" }),
     id: text("id").primaryKey().notNull(),

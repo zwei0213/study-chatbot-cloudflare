@@ -5,10 +5,10 @@ import {
   getStudyMessages,
   updateStudySession,
 } from "@/lib/study/queries";
-import { getStudyMaxExchanges } from "@/lib/study/study";
+import { getStudyMaxExchanges, STUDY_CONDITIONS } from "@/lib/study/study";
 import { StudySessionError } from "@/lib/study/timing";
 
-const requestSchema = z.object({ condition: z.enum(["a", "b"]) });
+const requestSchema = z.object({ condition: z.enum(STUDY_CONDITIONS) });
 
 export async function POST(request: Request) {
   try {

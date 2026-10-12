@@ -8,9 +8,13 @@ import { RateLimitError } from "@/lib/ratelimit";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawRedirect = searchParams.get("redirectUrl") || "/";
-  const redirectUrl = ["/", "/study", "/study/a", "/study/b"].includes(
-    rawRedirect
-  )
+  const redirectUrl = [
+    "/",
+    "/study",
+    "/study/a",
+    "/study/b",
+    "/study/c",
+  ].includes(rawRedirect)
     ? rawRedirect
     : "/";
 

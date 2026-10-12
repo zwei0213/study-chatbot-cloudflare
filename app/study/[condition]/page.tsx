@@ -1,9 +1,13 @@
 import { notFound } from "next/navigation";
 import { StudyChat } from "@/components/study-chat";
-import { isStudyCondition, studyWelcome } from "@/lib/study/study";
+import {
+  isStudyCondition,
+  STUDY_CONDITIONS,
+  studyWelcome,
+} from "@/lib/study/study";
 
 export function generateStaticParams() {
-  return [{ condition: "a" }, { condition: "b" }];
+  return STUDY_CONDITIONS.map((condition) => ({ condition }));
 }
 
 export default async function StudyPage({

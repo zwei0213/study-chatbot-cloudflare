@@ -4,7 +4,7 @@
 
 ## 功能
 
-- `/study/a` 和 `/study/b`：两种实验条件下的流式 AI 对话。
+- `/study/a`、`/study/b` 和 `/study/c`：流式 AI 对话。C 的完整提示词与 B 相同，会话记录独立保存。
 - `/admin`：查看、删除会话记录，并设置 DeepSeek API Key。
 - `lib/study/prompts.json`：配置共同提示词、A/B 条件提示词和独立的回复字数提示词。
 

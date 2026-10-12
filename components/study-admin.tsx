@@ -12,9 +12,10 @@ import {
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
 import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
+import type { StudyCondition } from "@/lib/study/study";
 
 type AdminSession = {
-  condition: "a" | "b";
+  condition: StudyCondition;
   createdAt: string;
   endedAt: string | null;
   id: string;
@@ -605,6 +606,7 @@ export function StudyAdmin({
                   <option value="all">全部条件</option>
                   <option value="a">条件 A</option>
                   <option value="b">条件 B</option>
+                  <option value="c">条件 C</option>
                 </select>
               </div>
               <form className="mt-4 flex gap-2" onSubmit={submitSearch}>

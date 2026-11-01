@@ -10,6 +10,13 @@ const gradeSchema = z.object({
   reference: z.string().max(300),
 });
 
+class EmptyModelResponseError extends Error {
+  constructor() {
+    super("Model returned an empty response.");
+    this.name = "EmptyModelResponseError";
+  }
+}
+
 async function completion(
   messages: { content: string; role: "system" | "user" | "assistant" }[],
   options: { json?: boolean; maxTokens?: number } = {}
@@ -23,6 +30,7 @@ async function completion(
       max_tokens: options.maxTokens ?? 256,
       messages,
       model: "deepseek-flash",
+      thinking: { type: "disabled" },
       ...(options.json ? { response_format: { type: "json_object" } } : {}),
       stream: false,
       ...(options.json ? { temperature: 0 } : {}),
@@ -43,7 +51,16 @@ async function completion(
     payload as { choices?: { message?: { content?: unknown } }[] }
   ).choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
-    throw new Error("Model returned an empty response.");
+    const choice = (
+      payload as {
+        choices?: { finish_reason?: string | null }[];
+      }
+    ).choices?.[0];
+    console.warn("Practice model completion returned empty content", {
+      finishReason: choice?.finish_reason ?? "unknown",
+      jsonMode: options.json ?? false,
+    });
+    throw new EmptyModelResponseError();
   }
   return content.trim();
 }
@@ -63,6 +80,7 @@ async function streamCompletion(
       messages,
       model: "deepseek-flash",
       stream: true,
+      thinking: { type: "disabled" },
     }),
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -81,7 +99,12 @@ async function streamCompletion(
     onText(text);
   });
   if (!result.trim()) {
-    throw new Error("Model returned an empty response.");
+    console.warn(
+      "Practice model stream returned no visible content; retrying once without streaming."
+    );
+    const fallback = await completion(messages, { maxTokens });
+    onText(fallback);
+    return fallback;
   }
   return result.trim();
 }
@@ -93,21 +116,36 @@ export async function judgePracticeAnswer(input: {
   chinese: string;
   reference: string;
 }) {
-  const raw = await completion(
-    [
-      { content: judgePrompt, role: "system" },
-      {
-        content: JSON.stringify(input),
-        role: "user",
-      },
-    ],
-    { json: true, maxTokens: 200 }
-  );
+  const messages = [
+    { content: judgePrompt, role: "system" as const },
+    { content: JSON.stringify(input), role: "user" as const },
+  ];
+  let raw: string;
+  try {
+    raw = await completion(messages, { json: true, maxTokens: 200 });
+  } catch (error) {
+    if (!(error instanceof EmptyModelResponseError)) {
+      throw error;
+    }
+    console.warn("Retrying practice grading without JSON response format.");
+    raw = await completion(messages, { maxTokens: 200 });
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (cause) {
-    throw new Error("Model returned an invalid grading response.", { cause });
+    const objectStart = raw.indexOf("{");
+    const objectEnd = raw.lastIndexOf("}");
+    if (objectStart < 0 || objectEnd <= objectStart) {
+      throw new Error("Model returned an invalid grading response.", { cause });
+    }
+    try {
+      parsed = JSON.parse(raw.slice(objectStart, objectEnd + 1));
+    } catch (fallbackCause) {
+      throw new Error("Model returned an invalid grading response.", {
+        cause: fallbackCause,
+      });
+    }
   }
   return gradeSchema.parse(parsed);
 }

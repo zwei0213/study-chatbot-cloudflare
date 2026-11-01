@@ -1,0 +1,209 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { getDb } from "@/lib/db/client";
+import { practiceMessage, practiceSession } from "@/lib/db/schema";
+import {
+  getPracticeSystemPrompt,
+  getPracticeWelcome,
+  PRACTICE_MODEL,
+  PRACTICE_PROMPT_VERSION,
+  type PracticeCondition,
+  type PracticeMessageKind,
+  type PracticePhase,
+} from "./flow";
+
+export async function getOrCreatePracticeSession(
+  userId: string,
+  condition: PracticeCondition
+) {
+  const db = await getDb();
+  const existing = await db
+    .select()
+    .from(practiceSession)
+    .where(
+      and(
+        eq(practiceSession.userId, userId),
+        eq(practiceSession.condition, condition)
+      )
+    )
+    .limit(1);
+  if (existing[0]) {
+    await ensurePracticeWelcome(db, existing[0].id, condition);
+    return existing[0];
+  }
+
+  const id = randomUUID();
+  await db
+    .insert(practiceSession)
+    .values({
+      condition,
+      id,
+      model: PRACTICE_MODEL,
+      phase: "ready",
+      promptVersion: PRACTICE_PROMPT_VERSION,
+      startedAt: new Date(),
+      systemPrompt: getPracticeSystemPrompt(condition),
+      userId,
+    })
+    .onConflictDoNothing();
+
+  const [session] = await db
+    .select()
+    .from(practiceSession)
+    .where(
+      and(
+        eq(practiceSession.userId, userId),
+        eq(practiceSession.condition, condition)
+      )
+    )
+    .limit(1);
+  if (!session) {
+    throw new Error("Unable to create practice session");
+  }
+  await ensurePracticeWelcome(db, session.id, condition);
+  return session;
+}
+
+async function ensurePracticeWelcome(
+  db: Awaited<ReturnType<typeof getDb>>,
+  sessionId: string,
+  condition: PracticeCondition
+) {
+  const [firstMessage] = await db
+    .select({ id: practiceMessage.id })
+    .from(practiceMessage)
+    .where(eq(practiceMessage.sessionId, sessionId))
+    .limit(1);
+  if (!firstMessage) {
+    await db
+      .insert(practiceMessage)
+      .values({
+        content: getPracticeWelcome(condition),
+        id: randomUUID(),
+        kind: "welcome",
+        role: "assistant",
+        sequence: 1,
+        sessionId,
+      })
+      .onConflictDoNothing();
+  }
+}
+
+export async function getPracticeSessionForUser(id: string, userId: string) {
+  const db = await getDb();
+  const [session] = await db
+    .select()
+    .from(practiceSession)
+    .where(and(eq(practiceSession.id, id), eq(practiceSession.userId, userId)))
+    .limit(1);
+  return session ?? null;
+}
+
+export async function getPracticeSessionMessages(sessionId: string) {
+  const db = await getDb();
+  return db
+    .select()
+    .from(practiceMessage)
+    .where(eq(practiceMessage.sessionId, sessionId))
+    .orderBy(asc(practiceMessage.sequence));
+}
+
+export type PracticeMessageInput = {
+  content: string;
+  grade?: boolean | null;
+  kind: PracticeMessageKind;
+  questionId?: string | null;
+  role: "user" | "assistant";
+};
+
+export async function savePracticeTurn(
+  session: { id: string },
+  messages: PracticeMessageInput[],
+  next: {
+    attempt?: number;
+    completedAt?: Date | null;
+    currentExtra?: number;
+    currentRequired?: number;
+    participantCode?: string | null;
+    phase: PracticePhase;
+    trainingGoal?: string;
+  }
+) {
+  const db = await getDb();
+  const [lastMessage] = await db
+    .select({
+      value: sql<number>`COALESCE(MAX(${practiceMessage.sequence}), 0)`,
+    })
+    .from(practiceMessage)
+    .where(eq(practiceMessage.sessionId, session.id));
+  const update = db
+    .update(practiceSession)
+    .set({ ...next, version: sql`${practiceSession.version} + 1` })
+    .where(eq(practiceSession.id, session.id));
+  const inserts = messages.map((message, offset) =>
+    db.insert(practiceMessage).values({
+      content: message.content,
+      grade: message.grade ?? null,
+      id: randomUUID(),
+      kind: message.kind,
+      questionId: message.questionId ?? null,
+      role: message.role,
+      sequence: (lastMessage?.value ?? 0) + offset + 1,
+      sessionId: session.id,
+    })
+  );
+  await db.batch([update, ...inserts]);
+  return getPracticeSessionMessages(session.id);
+}
+
+export async function listPracticeAdminSessions() {
+  const db = await getDb();
+  return db
+    .select()
+    .from(practiceSession)
+    .orderBy(desc(practiceSession.createdAt));
+}
+
+export async function listPracticeAdminExportRows() {
+  const db = await getDb();
+  return db
+    .select({
+      answerGrade: practiceMessage.grade,
+      condition: practiceSession.condition,
+      createdAt: practiceSession.createdAt,
+      message: practiceMessage.content,
+      messageCreatedAt: practiceMessage.createdAt,
+      messageId: practiceMessage.id,
+      messageKind: practiceMessage.kind,
+      participantCode: practiceSession.participantCode,
+      phase: practiceSession.phase,
+      promptVersion: practiceSession.promptVersion,
+      questionId: practiceMessage.questionId,
+      role: practiceMessage.role,
+      sequence: practiceMessage.sequence,
+      sessionId: practiceSession.id,
+      systemPrompt: practiceSession.systemPrompt,
+      userId: practiceSession.userId,
+    })
+    .from(practiceSession)
+    .leftJoin(
+      practiceMessage,
+      eq(practiceMessage.sessionId, practiceSession.id)
+    )
+    .orderBy(asc(practiceSession.createdAt), asc(practiceMessage.sequence));
+}
+
+export async function getPracticeAdminDetail(id: string) {
+  const db = await getDb();
+  const [session] = await db
+    .select()
+    .from(practiceSession)
+    .where(eq(practiceSession.id, id))
+    .limit(1);
+  if (!session) {
+    return null;
+  }
+  return { ...session, messages: await getPracticeSessionMessages(id) };
+}

@@ -1,0 +1,177 @@
+[
+  {
+    "id": "B01",
+    "phase": "required",
+    "zhPrompt": "如果他明天到得早，我们就一起准备早餐。",
+    "referenceEn": "If he arrives early tomorrow, we will prepare breakfast together.",
+    "order": 1
+  },
+  {
+    "id": "B02",
+    "phase": "required",
+    "zhPrompt": "如果她明天带来相机，我们就拍一些照片。",
+    "referenceEn": "If she brings a camera tomorrow, we will take some photos.",
+    "order": 2
+  },
+  {
+    "id": "B03",
+    "phase": "required",
+    "zhPrompt": "请帮我把灯打开。",
+    "referenceEn": "Please turn on the light for me.",
+    "order": 3
+  },
+  {
+    "id": "B04",
+    "phase": "required",
+    "zhPrompt": "这家店的价格很便宜。",
+    "referenceEn": "The prices at this store are very low.",
+    "order": 4
+  },
+  {
+    "id": "B05",
+    "phase": "required",
+    "zhPrompt": "别玩手机了。",
+    "referenceEn": "Stop playing with your phone.",
+    "order": 5
+  },
+  {
+    "id": "E01",
+    "phase": "extra",
+    "zhPrompt": "如果他明天买水果，我们就做一份沙拉。",
+    "referenceEn": "If he buys fruit tomorrow, we will make a salad.",
+    "order": 6
+  },
+  {
+    "id": "E02",
+    "phase": "extra",
+    "zhPrompt": "如果她明天找到钥匙，我们就打开门。",
+    "referenceEn": "If she finds the key tomorrow, we will open the door.",
+    "order": 7
+  },
+  {
+    "id": "E03",
+    "phase": "extra",
+    "zhPrompt": "如果他明天带来雨伞，我们就步行去学校。",
+    "referenceEn": "If he brings an umbrella tomorrow, we will walk to school.",
+    "order": 8
+  },
+  {
+    "id": "E04",
+    "phase": "extra",
+    "zhPrompt": "如果我妹妹明天起得早，我们就去公园跑步。",
+    "referenceEn": "If my sister gets up early tomorrow, we will run in the park.",
+    "order": 9
+  },
+  {
+    "id": "E05",
+    "phase": "extra",
+    "zhPrompt": "如果她明天收到邮件，我们就回复老师。",
+    "referenceEn": "If she receives the email tomorrow, we will reply to the teacher.",
+    "order": 10
+  },
+  {
+    "id": "E06",
+    "phase": "extra",
+    "zhPrompt": "如果他明天修好自行车，我们就骑车去公园。",
+    "referenceEn": "If he fixes the bike tomorrow, we will ride to the park.",
+    "order": 11
+  },
+  {
+    "id": "E07",
+    "phase": "extra",
+    "zhPrompt": "如果她明天带来课本，我们就复习这一课。",
+    "referenceEn": "If she brings her textbook tomorrow, we will review this lesson.",
+    "order": 12
+  },
+  {
+    "id": "E08",
+    "phase": "extra",
+    "zhPrompt": "如果老师明天布置作业，我们就明晚完成它。",
+    "referenceEn": "If the teacher assigns homework tomorrow, we will finish it tomorrow evening.",
+    "order": 13
+  },
+  {
+    "id": "E09",
+    "phase": "extra",
+    "zhPrompt": "如果他明天洗好衣服，我们就整理房间。",
+    "referenceEn": "If he washes the clothes tomorrow, we will clean the room.",
+    "order": 14
+  },
+  {
+    "id": "E10",
+    "phase": "extra",
+    "zhPrompt": "如果她明天准备好午餐，我们就一起吃饭。",
+    "referenceEn": "If she prepares lunch tomorrow, we will eat together.",
+    "order": 15
+  },
+  {
+    "id": "E11",
+    "phase": "extra",
+    "zhPrompt": "如果他明天参加比赛，我们就去看比赛。",
+    "referenceEn": "If he plays in the game tomorrow, we will watch it.",
+    "order": 16
+  },
+  {
+    "id": "E12",
+    "phase": "extra",
+    "zhPrompt": "如果他明天给我们打电话，我们就告诉他计划。",
+    "referenceEn": "If he calls us tomorrow, we will tell him the plan.",
+    "order": 17
+  },
+  {
+    "id": "E13",
+    "phase": "extra",
+    "zhPrompt": "如果她明天带来笔记，我们就一起复习考试。",
+    "referenceEn": "If she brings her notes tomorrow, we will study for the exam together.",
+    "order": 18
+  },
+  {
+    "id": "E14",
+    "phase": "extra",
+    "zhPrompt": "如果他明天完成报告，我们就把它发给老师。",
+    "referenceEn": "If he finishes the report tomorrow, we will send it to the teacher.",
+    "order": 19
+  },
+  {
+    "id": "E15",
+    "phase": "extra",
+    "zhPrompt": "如果她明天找到地址，我们就去拜访朋友。",
+    "referenceEn": "If she finds the address tomorrow, we will visit our friend.",
+    "order": 20
+  },
+  {
+    "id": "E16",
+    "phase": "extra",
+    "zhPrompt": "如果他明天带来水，我们就开始远足。",
+    "referenceEn": "If he brings water tomorrow, we will start the hike.",
+    "order": 21
+  },
+  {
+    "id": "E17",
+    "phase": "extra",
+    "zhPrompt": "如果她明天借到一本书，我们就一起读它。",
+    "referenceEn": "If she borrows a book tomorrow, we will read it together.",
+    "order": 22
+  },
+  {
+    "id": "E18",
+    "phase": "extra",
+    "zhPrompt": "如果他明天做完家务，我们就去打篮球。",
+    "referenceEn": "If he finishes his chores tomorrow, we will play basketball.",
+    "order": 23
+  },
+  {
+    "id": "E19",
+    "phase": "extra",
+    "zhPrompt": "如果她明天收拾好桌子，我们就开始画画。",
+    "referenceEn": "If she clears the table tomorrow, we will start drawing.",
+    "order": 24
+  },
+  {
+    "id": "E20",
+    "phase": "extra",
+    "zhPrompt": "如果她明天带来电脑，我们就一起做项目。",
+    "referenceEn": "If she brings her laptop tomorrow, we will work on the project together.",
+    "order": 25
+  }
+]

@@ -14,6 +14,8 @@ export async function GET(request: Request) {
     "/study/a",
     "/study/b",
     "/study/c",
+    "/practice/low",
+    "/practice/high",
   ].includes(rawRedirect)
     ? rawRedirect
     : "/";

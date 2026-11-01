@@ -3,7 +3,14 @@ import "server-only";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { drizzle } from "drizzle-orm/d1";
 import { cache } from "react";
-import { studyAdminSetting, studyMessage, studySession, user } from "./schema";
+import {
+  practiceMessage,
+  practiceSession,
+  studyAdminSetting,
+  studyMessage,
+  studySession,
+  user,
+} from "./schema";
 
 type D1Env = {
   DB?: unknown;
@@ -17,6 +24,13 @@ export const getDb = cache(async () => {
   }
 
   return drizzle(database as never, {
-    schema: { studyAdminSetting, studyMessage, studySession, user },
+    schema: {
+      practiceMessage,
+      practiceSession,
+      studyAdminSetting,
+      studyMessage,
+      studySession,
+      user,
+    },
   });
 });

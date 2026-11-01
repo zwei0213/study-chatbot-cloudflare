@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
+import { PracticeAdminHistory } from "@/components/practice-admin-history";
 import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
 import type { StudyCondition } from "@/lib/study/study";
 
@@ -566,6 +567,8 @@ export function StudyAdmin({
             ) : null}
           </form>
         </section>
+
+        <PracticeAdminHistory />
 
         {error ? (
           <p

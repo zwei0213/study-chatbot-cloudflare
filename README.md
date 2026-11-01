@@ -5,8 +5,11 @@
 ## 功能
 
 - `/study/a`、`/study/b` 和 `/study/c`：流式 AI 对话。C 的完整提示词与 B 相同，会话记录独立保存。
+- `/practice/low` 和 `/practice/high`：低温暖/高温暖两种汉译英 AI 陪练页面，使用 DeepSeek `deepseek-flash`，完成必做题后可选加练；提前退出不会发放完成编码。
 - `/admin`：查看、删除会话记录，并设置 DeepSeek API Key。
+- 管理后台也可查看陪练实验进度与完整对话，并导出 CSV。
 - `lib/study/prompts.json`：配置共同提示词、A/B 条件提示词和独立的回复字数提示词。
+- `lib/practice/prompts.json`、`lib/practice/questions.json`：配置陪练系统提示词和题库。
 
 ## 部署到 Cloudflare Workers
 
@@ -41,7 +44,7 @@
   npx wrangler deploy
   ```
 
-构建命令会将 `migrations/` 中尚未执行的 SQL 迁移应用到你自己的远程 D1，再构建应用。构建部署所用的 Cloudflare API Token 需要 **Workers Scripts: Edit** 和 **D1: Edit** 权限。若自动生成的 Token 没有 D1 权限，请在构建设置中改用具有这些权限的 Token，否则数据库迁移会失败。
+构建命令会将 `migrations/` 中尚未执行的 SQL 迁移应用到你自己的远程 D1，再构建应用。新加的汉译英陪练使用 `0004_add_practice.sql`，部署时会一并迁移。构建部署所用的 Cloudflare API Token 需要 **Workers Scripts: Edit** 和 **D1: Edit** 权限。若自动生成的 Token 没有 D1 权限，请在构建设置中改用具有这些权限的 Token，否则数据库迁移会失败。
 
 ### 3. 设置 Worker Secrets
 

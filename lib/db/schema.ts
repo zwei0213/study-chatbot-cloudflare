@@ -78,6 +78,7 @@ export const practiceSession = sqliteTable(
     participantCode: text("participantCode"),
     phase: text("phase").notNull(),
     promptVersion: text("promptVersion").notNull(),
+    questionsJson: text("questionsJson"),
     startedAt: integer("startedAt", { mode: "timestamp_ms" }).notNull(),
     systemPrompt: text("systemPrompt").notNull(),
     trainingGoal: text("trainingGoal"),
@@ -85,6 +86,7 @@ export const practiceSession = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     version: integer("version").notNull().default(0),
+    welcomeText: text("welcomeText"),
   },
   (table) => ({
     conditionCreated: index("PracticeSession_condition_created_idx").on(
@@ -129,6 +131,14 @@ export const practiceMessage = sqliteTable(
 export type PracticeMessage = InferSelectModel<typeof practiceMessage>;
 
 export const studyAdminSetting = sqliteTable("StudyAdminSetting", {
+  key: text("key").primaryKey().notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  value: text("value").notNull(),
+});
+
+export const practiceAdminSetting = sqliteTable("PracticeAdminSetting", {
   key: text("key").primaryKey().notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
     .notNull()

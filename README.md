@@ -7,9 +7,10 @@
 - `/study/a`、`/study/b` 和 `/study/c`：流式 AI 对话。C 的完整提示词与 B 相同，会话记录独立保存。
 - `/practice/low` 和 `/practice/high`：低温暖/高温暖两种汉译英 AI 陪练页面，使用 DeepSeek `deepseek-flash`，完成必做题后可选加练；提前退出不会发放完成编码。
 - `/admin`：A/B/C 聊天会话管理和 DeepSeek API Key 设置。
-- `/manage/practice`：独立的汉译英陪练实验记录、按完成编码搜索、删除记录和 CSV 导出。
+- `/manage/practice`：独立管理汉译英陪练设置（DeepSeek API Key/模型、提示词、欢迎语、题库）和实验记录；支持按完成编码搜索、删除记录和 CSV 导出。
+- 管理员操作步骤见 [`docs/管理员使用说明.md`](docs/管理员使用说明.md)。
 - `lib/study/prompts.json`：配置共同提示词、A/B 条件提示词和独立的回复字数提示词。
-- `lib/practice/prompts.json`、`lib/practice/questions.json`：配置陪练系统提示词和题库。
+- `lib/practice/prompts.json`、`lib/practice/questions.json`：陪练提示词和题库的默认值；也可在 `/manage/practice` 后台编辑。
 
 ## 部署到 Cloudflare Workers
 
@@ -44,7 +45,7 @@
   npx wrangler deploy
   ```
 
-构建命令会将 `migrations/` 中尚未执行的 SQL 迁移应用到你自己的远程 D1，再构建应用。新加的汉译英陪练使用 `0004_add_practice.sql`，部署时会一并迁移。构建部署所用的 Cloudflare API Token 需要 **Workers Scripts: Edit** 和 **D1: Edit** 权限。若自动生成的 Token 没有 D1 权限，请在构建设置中改用具有这些权限的 Token，否则数据库迁移会失败。
+构建命令会将 `migrations/` 中尚未执行的 SQL 迁移应用到你自己的远程 D1，再构建应用。汉译英陪练及其后台配置使用 `0004_add_practice.sql` 和 `0005_practice_settings.sql`，部署时会一并迁移。构建部署所用的 Cloudflare API Token 需要 **Workers Scripts: Edit** 和 **D1: Edit** 权限。若自动生成的 Token 没有 D1 权限，请在构建设置中改用具有这些权限的 Token，否则数据库迁移会失败。
 
 ### 3. 设置 Worker Secrets
 
@@ -54,7 +55,7 @@
 | --- | --- |
 | `AUTH_SECRET` | NextAuth 会话加密密钥；使用随机生成的长密钥。 |
 | `STUDY_ADMIN_TOKEN` | `/admin` 管理员登录密钥，至少 32 个字符。 |
-| `DEEPSEEK_API_KEY` | DeepSeek API 密钥。也可以部署后登录 `/admin` 设置 API Key，此项就可以不配置。 |
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥的环境变量回退值。陪练可在 `/manage/practice` 单独设置 API Key；A/B/C 聊天仍在 `/admin` 配置。 |
 
 不要把真实密钥写进代码、提交到 GitHub，或填入公开的 `wrangler.jsonc`。配置完 Secrets 后，如 Worker 尚未使用新配置，重新部署一次。
 

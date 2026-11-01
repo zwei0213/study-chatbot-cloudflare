@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { practiceMessage, practiceSession } from "@/lib/db/schema";
+import { getPracticeRuntimeConfig } from "./config";
 import {
   getPracticeSystemPrompt,
-  PRACTICE_MODEL,
-  PRACTICE_PROMPT_VERSION,
+  getPracticeWelcome,
   type PracticeCondition,
   type PracticeMessageKind,
   type PracticePhase,
@@ -18,6 +18,7 @@ export async function getOrCreatePracticeSession(
   condition: PracticeCondition
 ) {
   const db = await getDb();
+  const config = await getPracticeRuntimeConfig();
   const existing = await db
     .select()
     .from(practiceSession)
@@ -38,12 +39,14 @@ export async function getOrCreatePracticeSession(
     .values({
       condition,
       id,
-      model: PRACTICE_MODEL,
+      model: config.model,
       phase: "ready",
-      promptVersion: PRACTICE_PROMPT_VERSION,
+      promptVersion: config.promptVersion,
+      questionsJson: JSON.stringify(config.questions),
       startedAt: new Date(),
-      systemPrompt: getPracticeSystemPrompt(condition),
+      systemPrompt: getPracticeSystemPrompt(condition, config),
       userId,
+      welcomeText: getPracticeWelcome(condition, config),
     })
     .onConflictDoNothing();
 

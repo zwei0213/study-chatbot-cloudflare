@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { getPracticeQuestion, type PracticePhase } from "./flow";
 import type { PracticeMessageInput } from "./queries";
+import type { PracticeQuestion } from "./validation";
 
 type SessionProgress = {
   currentExtra: number;
@@ -48,7 +49,8 @@ export function leavePractice(completedRequired: number) {
 
 export function advanceAfterQuestion(
   progress: SessionProgress,
-  questionType: "required" | "extra"
+  questionType: "required" | "extra",
+  questionBank?: PracticeQuestion[]
 ) {
   if (questionType === "required") {
     const currentRequired = progress.currentRequired + 1;
@@ -66,7 +68,12 @@ export function advanceAfterQuestion(
         phase: "extra-choice" as const,
       };
     }
-    return nextQuestion(currentRequired, progress.currentExtra, "required");
+    return nextQuestion(
+      currentRequired,
+      progress.currentExtra,
+      "required",
+      questionBank
+    );
   }
 
   const currentExtra = progress.currentExtra + 1;
@@ -95,14 +102,18 @@ export function advanceAfterQuestion(
 export function nextQuestion(
   currentRequired: number,
   currentExtra: number,
-  type: "required" | "extra"
+  type: "required" | "extra",
+  questionBank?: PracticeQuestion[]
 ) {
   const phase: PracticePhase = type === "required" ? "required" : "extra";
-  const question = getPracticeQuestion({
-    currentExtra,
-    currentRequired,
-    phase,
-  });
+  const question = getPracticeQuestion(
+    {
+      currentExtra,
+      currentRequired,
+      phase,
+    },
+    questionBank
+  );
   if (!question) {
     throw new Error("Practice question is missing.");
   }

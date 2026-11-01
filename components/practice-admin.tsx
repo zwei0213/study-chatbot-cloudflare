@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, type FormEvent, useCallback, useState } from "react";
 import { PracticeAdminHistory } from "@/components/practice-admin-history";
+import { PracticeAdminSettings } from "@/components/practice-admin-settings";
 import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
 
 export function PracticeAdmin({
@@ -124,6 +125,7 @@ export function PracticeAdmin({
             </button>
           </div>
         </header>
+        <PracticeAdminSettings />
         <PracticeAdminHistory />
       </div>
     </main>

@@ -4,6 +4,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { drizzle } from "drizzle-orm/d1";
 import { cache } from "react";
 import {
+  practiceAdminSetting,
   practiceMessage,
   practiceSession,
   studyAdminSetting,
@@ -25,6 +26,7 @@ export const getDb = cache(async () => {
 
   return drizzle(database as never, {
     schema: {
+      practiceAdminSetting,
       practiceMessage,
       practiceSession,
       studyAdminSetting,

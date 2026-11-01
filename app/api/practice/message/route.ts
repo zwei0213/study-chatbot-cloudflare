@@ -12,6 +12,7 @@ import {
   createPracticeFeedback,
   judgePracticeAnswer,
 } from "@/lib/practice/ai";
+import { parsePracticeQuestionSnapshot } from "@/lib/practice/config";
 import {
   getPracticeQuestion,
   getPracticeWelcome,
@@ -71,6 +72,7 @@ async function processPracticeTurn(
     stop: "结束练习",
   };
   const phase = session.phase as PracticePhase;
+  const questionBank = parsePracticeQuestionSnapshot(session.questionsJson);
   const text = input.text?.trim() ?? "";
   const submittedText = text || (input.action ? actionText[input.action] : "");
   const newMessages: Parameters<typeof savePracticeTurn>[1] = [];
@@ -89,7 +91,8 @@ async function processPracticeTurn(
     if (input.action !== "start") {
       throw new Error("请点击“开始对话”开始本次练习。");
     }
-    const welcome = getPracticeWelcome(session.condition);
+    const welcome =
+      session.welcomeText ?? getPracticeWelcome(session.condition);
     await streamFixedText(welcome, onText);
     newMessages.push(withUserMessage(submittedText, "notice"), {
       content: welcome,
@@ -118,9 +121,10 @@ async function processPracticeTurn(
     }
     const acknowledgement = await acknowledgePracticeGoal(
       { goal: text, systemPrompt: session.systemPrompt },
-      onText
+      onText,
+      session.model
     );
-    const firstQuestion = nextQuestion(0, 0, "required");
+    const firstQuestion = nextQuestion(0, 0, "required", questionBank);
     newMessages.push(
       withUserMessage(text, "goal"),
       { content: acknowledgement, kind: "goal", role: "assistant" },
@@ -138,13 +142,14 @@ async function processPracticeTurn(
       });
       next = { phase: "retry-answer" };
     } else if (input.action === "skip") {
-      const question = getPracticeQuestion({ ...session, phase });
+      const question = getPracticeQuestion({ ...session, phase }, questionBank);
       if (!question) {
         throw new Error("Practice question is missing.");
       }
       const resolved = advanceAfterQuestion(
         { ...session, phase },
-        session.currentRequired >= 5 ? "extra" : "required"
+        session.currentRequired >= 5 ? "extra" : "required",
+        questionBank
       );
       const referenceMessage = `本题参考表达：${question.referenceEn}`;
       await streamFixedText(referenceMessage, onText);
@@ -172,7 +177,8 @@ async function processPracticeTurn(
       const firstExtra = nextQuestion(
         session.currentRequired,
         session.currentExtra,
-        "extra"
+        "extra",
+        questionBank
       );
       newMessages.push(
         withUserMessage(submittedText, "notice"),
@@ -203,15 +209,18 @@ async function processPracticeTurn(
     if (!text) {
       throw new Error("请输入你的英文翻译。");
     }
-    const question = getPracticeQuestion({ ...session, phase });
+    const question = getPracticeQuestion({ ...session, phase }, questionBank);
     if (!question) {
       throw new Error("Practice question is missing.");
     }
-    const grade = await judgePracticeAnswer({
-      answer: text,
-      chinese: question.zhPrompt,
-      reference: question.referenceEn,
-    });
+    const grade = await judgePracticeAnswer(
+      {
+        answer: text,
+        chinese: question.zhPrompt,
+        reference: question.referenceEn,
+      },
+      session.model
+    );
     const isRetry = phase === "retry-answer";
     const savedUser = withUserMessage(text, "answer");
 
@@ -242,11 +251,13 @@ async function processPracticeTurn(
           showReference: isRetry,
           systemPrompt: session.systemPrompt,
         },
-        onText
+        onText,
+        session.model
       );
       const resolved = advanceAfterQuestion(
         { ...session, phase },
-        session.currentRequired >= 5 ? "extra" : "required"
+        session.currentRequired >= 5 ? "extra" : "required",
+        questionBank
       );
       newMessages.push(
         savedUser,

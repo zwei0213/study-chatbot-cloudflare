@@ -9,8 +9,7 @@ import {
 } from "@/lib/practice/advance";
 import {
   acknowledgePracticeGoal,
-  createPracticeFeedback,
-  judgePracticeAnswer,
+  evaluatePracticeAnswer,
 } from "@/lib/practice/ai";
 import { parsePracticeQuestionSnapshot } from "@/lib/practice/config";
 import {
@@ -213,35 +212,23 @@ async function processPracticeTurn(
     if (!question) {
       throw new Error("Practice question is missing.");
     }
-    const grade = await judgePracticeAnswer(
+    const isRetry = phase === "retry-answer";
+    const evaluation = await evaluatePracticeAnswer(
       {
         answer: text,
         chinese: question.zhPrompt,
+        isRetry,
         reference: question.referenceEn,
+        systemPrompt: session.systemPrompt,
       },
+      onText,
       session.model
     );
-    const isRetry = phase === "retry-answer";
     const savedUser = withUserMessage(text, "answer");
 
-    if (!grade.correct && !isRetry) {
-      const issue = grade.issue.trim() || "有一处意思或语法需要调整";
-      const feedback = await createPracticeFeedback(
-        {
-          answer: text,
-          correct: false,
-          firstAttempt: true,
-          issue,
-          question: question.zhPrompt,
-          reference: grade.reference || question.referenceEn,
-          showReference: false,
-          systemPrompt: session.systemPrompt,
-        },
-        onText,
-        session.model
-      );
+    if (!evaluation.correct && !isRetry) {
       newMessages.push(savedUser, {
-        content: feedback,
+        content: evaluation.feedback,
         grade: false,
         kind: "feedback",
         questionId: question.id,
@@ -249,20 +236,6 @@ async function processPracticeTurn(
       });
       next = { phase: "retry-choice" };
     } else {
-      const feedback = await createPracticeFeedback(
-        {
-          answer: text,
-          correct: grade.correct,
-          firstAttempt: !isRetry,
-          issue: grade.issue,
-          question: question.zhPrompt,
-          reference: grade.reference || question.referenceEn,
-          showReference: isRetry,
-          systemPrompt: session.systemPrompt,
-        },
-        onText,
-        session.model
-      );
       const resolved = advanceAfterQuestion(
         { ...session, phase },
         session.currentRequired >= 5 ? "extra" : "required",
@@ -271,8 +244,8 @@ async function processPracticeTurn(
       newMessages.push(
         savedUser,
         {
-          content: feedback,
-          grade: grade.correct,
+          content: evaluation.feedback,
+          grade: evaluation.correct,
           kind: "feedback",
           questionId: question.id,
           role: "assistant",

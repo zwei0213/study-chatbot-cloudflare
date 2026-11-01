@@ -168,7 +168,7 @@ export function createPracticeFeedback(
   onText: (text: string) => void,
   model = "deepseek-flash"
 ) {
-  const system = `${input.systemPrompt}\n\n本轮任务：只对当前翻译题提供反馈。正确性已由独立判题器决定，必须严格遵守提供的correct值，不自行改判。判对时简短确认真实正确之处。重试后仍判错时，指出问题并提供正确参考表达。不要给分数，不使用表情符号或Markdown标题，不输出下一题题干。首次答错反馈由后端固定生成。`;
+  const system = `${input.systemPrompt}\n\n本轮任务：只对当前翻译题提供反馈。正确性已由独立判题器决定，必须严格遵守提供的correct值，不自行改判。判对时简短确认真实正确之处。首次答错时，用自然的对话方式明确说明答案有问题，结合判题说明指出主要错误和修改方向；不要照抄或重复判题说明，不提供完整参考译文，然后自然询问是否愿意重试，并说明可以重试或跳过。重试后仍判错时，指出问题并提供正确参考表达。不要给分数，不使用表情符号或Markdown标题，不输出下一题题干。`;
   const user = JSON.stringify({
     answer: input.answer,
     correct: input.correct,

@@ -226,11 +226,20 @@ async function processPracticeTurn(
 
     if (!grade.correct && !isRetry) {
       const issue = grade.issue.trim() || "有一处意思或语法需要调整";
-      const feedback =
-        session.condition === "high"
-          ? `这次的答案不正确，没关系，我们一起看需要调整的地方：${issue}。请根据这个提示修改，但先不要担心完整表达。你愿意再试一次吗？请选择“重试”或“跳过”。`
-          : `答案不正确。主要问题：${issue}。请根据这个问题修改译文。是否重试？请选择“重试”或“跳过”。`;
-      await streamFixedText(feedback, onText);
+      const feedback = await createPracticeFeedback(
+        {
+          answer: text,
+          correct: false,
+          firstAttempt: true,
+          issue,
+          question: question.zhPrompt,
+          reference: grade.reference || question.referenceEn,
+          showReference: false,
+          systemPrompt: session.systemPrompt,
+        },
+        onText,
+        session.model
+      );
       newMessages.push(savedUser, {
         content: feedback,
         grade: false,

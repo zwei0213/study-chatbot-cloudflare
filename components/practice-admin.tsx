@@ -114,12 +114,6 @@ export function PracticeAdmin({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <a
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-              href="/admin"
-            >
-              A/B/C 聊天后台
-            </a>
             <button
               className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
               disabled={busy}

@@ -22,7 +22,11 @@ export async function POST(request: Request) {
       user.id,
       body.data.condition
     );
-    const messages = await getPracticeSessionMessages(session.id);
+    const savedMessages = await getPracticeSessionMessages(session.id);
+    const messages =
+      session.phase === "ready"
+        ? savedMessages.filter((message) => message.kind !== "welcome")
+        : savedMessages;
     return Response.json(
       {
         condition: session.condition,

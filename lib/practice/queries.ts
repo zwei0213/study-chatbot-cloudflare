@@ -6,7 +6,6 @@ import { getDb } from "@/lib/db/client";
 import { practiceMessage, practiceSession } from "@/lib/db/schema";
 import {
   getPracticeSystemPrompt,
-  getPracticeWelcome,
   PRACTICE_MODEL,
   PRACTICE_PROMPT_VERSION,
   type PracticeCondition,
@@ -30,7 +29,6 @@ export async function getOrCreatePracticeSession(
     )
     .limit(1);
   if (existing[0]) {
-    await ensurePracticeWelcome(db, existing[0].id, condition);
     return existing[0];
   }
 
@@ -62,33 +60,7 @@ export async function getOrCreatePracticeSession(
   if (!session) {
     throw new Error("Unable to create practice session");
   }
-  await ensurePracticeWelcome(db, session.id, condition);
   return session;
-}
-
-async function ensurePracticeWelcome(
-  db: Awaited<ReturnType<typeof getDb>>,
-  sessionId: string,
-  condition: PracticeCondition
-) {
-  const [firstMessage] = await db
-    .select({ id: practiceMessage.id })
-    .from(practiceMessage)
-    .where(eq(practiceMessage.sessionId, sessionId))
-    .limit(1);
-  if (!firstMessage) {
-    await db
-      .insert(practiceMessage)
-      .values({
-        content: getPracticeWelcome(condition),
-        id: randomUUID(),
-        kind: "welcome",
-        role: "assistant",
-        sequence: 1,
-        sessionId,
-      })
-      .onConflictDoNothing();
-  }
 }
 
 export async function getPracticeSessionForUser(id: string, userId: string) {

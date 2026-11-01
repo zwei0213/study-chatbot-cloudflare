@@ -6,8 +6,8 @@
 
 - `/study/a`、`/study/b` 和 `/study/c`：流式 AI 对话。C 的完整提示词与 B 相同，会话记录独立保存。
 - `/practice/low` 和 `/practice/high`：低温暖/高温暖两种汉译英 AI 陪练页面，使用 DeepSeek `deepseek-flash`，完成必做题后可选加练；提前退出不会发放完成编码。
-- `/admin`：查看、删除会话记录，并设置 DeepSeek API Key。
-- 管理后台也可查看陪练实验进度与完整对话，并导出 CSV。
+- `/admin`：A/B/C 聊天会话管理和 DeepSeek API Key 设置。
+- `/admin/practice`：独立的汉译英陪练实验记录、对话详情和 CSV 导出。
 - `lib/study/prompts.json`：配置共同提示词、A/B 条件提示词和独立的回复字数提示词。
 - `lib/practice/prompts.json`、`lib/practice/questions.json`：配置陪练系统提示词和题库。
 

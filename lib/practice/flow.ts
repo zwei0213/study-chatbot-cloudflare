@@ -4,6 +4,7 @@ import bank from "./questions.json";
 export type PracticeCondition = "low" | "high";
 export type PracticePhase =
   | "ready"
+  | "confirm-ready"
   | "goal"
   | "required"
   | "retry-choice"

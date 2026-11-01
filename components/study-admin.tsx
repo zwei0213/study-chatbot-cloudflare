@@ -11,7 +11,6 @@ import {
   useState,
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
-import { PracticeAdminHistory } from "@/components/practice-admin-history";
 import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
 import type { StudyCondition } from "@/lib/study/study";
 
@@ -460,23 +459,31 @@ export function StudyAdmin({
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Study Console
+              A/B/C Chat Console
             </p>
             <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">
-              研究管理后台
+              A/B/C 聊天后台
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              查看参与者对话记录，管理 DeepSeek API Key。
+              管理 A/B/C 聊天会话和 DeepSeek API Key。
             </p>
           </div>
-          <button
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
-            disabled={keyBusy || deleteBusy}
-            onClick={handleLogout}
-            type="button"
-          >
-            退出登录
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100"
+              href="/admin/practice"
+            >
+              英语陪练实验后台
+            </a>
+            <button
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50"
+              disabled={keyBusy || deleteBusy}
+              onClick={handleLogout}
+              type="button"
+            >
+              退出登录
+            </button>
+          </div>
         </header>
 
         <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -567,8 +574,6 @@ export function StudyAdmin({
             ) : null}
           </form>
         </section>
-
-        <PracticeAdminHistory />
 
         {error ? (
           <p

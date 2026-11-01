@@ -13,7 +13,11 @@ import {
 } from "react";
 import { ChatMessageText } from "@/components/chat-message-text";
 import type { PracticeCondition, PracticePhase } from "@/lib/practice/flow";
-import { getStudyErrorMessage, readStudyJson } from "@/lib/study/client";
+import {
+  getStudyErrorMessage,
+  readStudyChatStream,
+  readStudyJson,
+} from "@/lib/study/client";
 
 type PracticeMessage = {
   content: string;
@@ -46,6 +50,8 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmExit, setConfirmExit] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
+  const [pendingUserText, setPendingUserText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopped = state?.phase === "completed" || state?.phase === "incomplete";
 
@@ -88,6 +94,19 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
       setBusy(true);
       setError("");
       setConfirmExit(false);
+      setStreamingText("");
+      setPendingUserText(
+        payload.text?.trim() ??
+          {
+            continue: "继续加练",
+            ready: "我准备好了",
+            retry: "愿意重试",
+            skip: "跳过本题",
+            start: "开始对话",
+            stop: "结束练习",
+          }[payload.action ?? ""] ??
+          ""
+      );
       const previousInput = input;
       if (payload.text !== undefined) {
         setInput("");
@@ -98,29 +117,41 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
           headers: { "Content-Type": "application/json" },
           method: "POST",
         });
-        const data = await readStudyJson<
-          Partial<PracticeState> & { messages: PracticeMessage[] }
-        >(response);
-        setState((current) =>
-          current
-            ? {
-                ...current,
-                currentExtra: data.currentExtra ?? current.currentExtra,
-                currentRequired:
-                  data.currentRequired ?? current.currentRequired,
-                messages: [...current.messages, ...data.messages],
-                participantCode:
-                  data.participantCode ?? current.participantCode,
-                phase: data.phase ?? current.phase,
-              }
-            : current
-        );
+        await readStudyChatStream<PracticeMessage>(response, (event) => {
+          if (event.type === "delta") {
+            setStreamingText((current) => current + event.text);
+          } else {
+            const metadata = event.metadata as
+              | Partial<PracticeState>
+              | undefined;
+            setState((current) =>
+              current
+                ? {
+                    ...current,
+                    currentExtra:
+                      metadata?.currentExtra ?? current.currentExtra,
+                    currentRequired:
+                      metadata?.currentRequired ?? current.currentRequired,
+                    messages: [...current.messages, ...event.messages],
+                    participantCode:
+                      metadata?.participantCode ?? current.participantCode,
+                    phase: metadata?.phase ?? current.phase,
+                    trainingGoal:
+                      metadata?.trainingGoal ?? current.trainingGoal,
+                  }
+                : current
+            );
+            setPendingUserText("");
+          }
+        });
       } catch (cause) {
+        setPendingUserText("");
         if (payload.text !== undefined) {
           setInput(previousInput);
         }
         setError(getStudyErrorMessage(cause, "发送失败，请检查网络后重试。"));
       } finally {
+        setStreamingText("");
         setBusy(false);
       }
     },
@@ -140,7 +171,10 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
 
   const actions = useMemo(() => {
     if (state?.phase === "ready") {
-      return [{ action: "start", label: "开始训练" }];
+      return [{ action: "start", label: "开始对话" }];
+    }
+    if (state?.phase === "confirm-ready") {
+      return [{ action: "ready", label: "我准备好了" }];
     }
     if (state?.phase === "retry-choice") {
       return [
@@ -240,7 +274,17 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
               <ChatMessageText text={message.content} />
             </article>
           ))}
-          {busy ? (
+          {pendingUserText ? (
+            <article className="ml-auto max-w-[92%] rounded-2xl bg-slate-900 px-4 py-3 text-sm leading-7 text-white sm:max-w-[86%]">
+              <ChatMessageText text={pendingUserText} />
+            </article>
+          ) : null}
+          {streamingText ? (
+            <article className="mr-auto max-w-[92%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 shadow-sm sm:max-w-[86%]">
+              <ChatMessageText text={streamingText} />
+            </article>
+          ) : null}
+          {busy && !streamingText ? (
             <p
               className="mr-auto rounded-xl bg-white px-4 py-3 text-sm text-slate-500"
               role="status"

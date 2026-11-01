@@ -60,7 +60,11 @@ export async function readStudyJson<T>(response: Response): Promise<T> {
 
 export type StudyChatEvent<TMessage> =
   | { type: "delta"; text: string }
-  | { type: "done"; messages: TMessage[] };
+  | {
+      type: "done";
+      messages: TMessage[];
+      metadata?: Record<string, unknown>;
+    };
 
 export async function readStudyChatStream<TMessage>(
   response: Response,
@@ -98,6 +102,7 @@ export async function readStudyChatStream<TMessage>(
       type?: unknown;
       text?: unknown;
       messages?: unknown;
+      metadata?: unknown;
       error?: unknown;
     };
     try {
@@ -111,7 +116,14 @@ export async function readStudyChatStream<TMessage>(
     if (event.type === "delta" && typeof event.text === "string") {
       onEvent({ text: event.text, type: "delta" });
     } else if (event.type === "done" && Array.isArray(event.messages)) {
-      onEvent({ messages: event.messages as TMessage[], type: "done" });
+      onEvent({
+        messages: event.messages as TMessage[],
+        metadata:
+          event.metadata && typeof event.metadata === "object"
+            ? (event.metadata as Record<string, unknown>)
+            : undefined,
+        type: "done",
+      });
       completed = true;
     } else if (event.type === "error") {
       throw new StudyApiError(

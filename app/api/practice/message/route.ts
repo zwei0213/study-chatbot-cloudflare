@@ -10,6 +10,7 @@ import {
 import {
   acknowledgePracticeGoal,
   evaluatePracticeAnswer,
+  generatePracticeReply,
 } from "@/lib/practice/ai";
 import { parsePracticeQuestionSnapshot } from "@/lib/practice/config";
 import {
@@ -45,17 +46,79 @@ type TurnState = {
   trainingGoal?: string;
 };
 
-function streamFixedText(text: string, onText: (text: string) => void) {
-  return (async () => {
-    for (let index = 0; index < text.length; index += 12) {
-      onText(text.slice(index, index + 12));
-      if (index + 12 < text.length) {
-        // biome-ignore lint/performance/noAwaitInLoops: Separate fixed text into visible stream chunks.
-        await new Promise((resolve) => setTimeout(resolve, 18));
-      }
+type PracticeTurnResult = TurnState & {
+  messages: Parameters<typeof savePracticeTurn>[1];
+};
+
+function generateFlowReply(
+  session: NonNullable<Awaited<ReturnType<typeof getPracticeSessionForUser>>>,
+  instruction: string,
+  context: Record<string, unknown>,
+  onText: (text: string) => void
+) {
+  return generatePracticeReply(
+    { context, instruction, systemPrompt: session.systemPrompt },
+    onText,
+    session.model
+  );
+}
+
+async function personalizeTransition<T extends PracticeTurnResult>(
+  result: T,
+  session: NonNullable<Awaited<ReturnType<typeof getPracticeSessionForUser>>>,
+  reason: "required-complete" | "extra-complete" | "finish" | "exit",
+  onText: (text: string) => void
+): Promise<T> {
+  if (result.phase === "extra-choice") {
+    const instruction =
+      reason === "required-complete"
+        ? "参与者已经完成必做阶段。自然地告知这部分已完成，并询问是否愿意自主加练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定。不要提具体题数。"
+        : "参与者完成了一道加练题。自然地询问是否继续加练或结束训练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定，也不要提具体题数。";
+    const content = await generateFlowReply(
+      session,
+      instruction,
+      { currentExtra: result.currentExtra, currentRequired: result.currentRequired },
+      onText
+    );
+    return {
+      ...result,
+      messages: result.messages.map((message) =>
+        message.kind === "notice" && message.role === "assistant"
+          ? { ...message, content }
+          : message
+      ) as T["messages"],
+    };
+  }
+
+  if (result.phase === "completed" || result.phase === "incomplete") {
+    const isCompleted = result.phase === "completed";
+    const content = await generateFlowReply(
+      session,
+      isCompleted
+        ? "参与者已经完成实验流程。自然地表达感谢并结束对话，不要编造或提及完成编码；系统会在你的回复后附上准确编码。"
+        : "参与者选择提前结束且尚未完成必做阶段。尊重其决定，自然地结束对话并说明本次无法获得完成编码。不要责备、挽留或编造编码。",
+      {},
+      onText
+    );
+    const codeSuffix =
+      isCompleted && result.participantCode
+        ? `\n\n完成编码：${result.participantCode}`
+        : "";
+    if (codeSuffix) {
+      onText(codeSuffix);
     }
-    return text;
-  })();
+    return {
+      ...result,
+      messages: result.messages.map((message) =>
+        message.role === "assistant" &&
+        (message.kind === "completion" || message.kind === "exit")
+          ? { ...message, content: `${content}${codeSuffix}` }
+          : message
+      ) as T["messages"],
+    };
+  }
+
+  return result;
 }
 
 async function processPracticeTurn(
@@ -88,9 +151,12 @@ async function processPracticeTurn(
   let next: TurnState;
 
   if (input.action === "stop" || /^(结束训练|结束练习|退出实验|不再继续)$/.test(text)) {
-    const result = leavePractice(session.currentRequired, requiredCount);
-    const [exitMessage] = result.messages;
-    await streamFixedText(exitMessage.content, onText);
+    const result = await personalizeTransition(
+      leavePractice(session.currentRequired, requiredCount),
+      session,
+      "exit",
+      onText
+    );
     newMessages.push(
       withUserMessage(submittedText || "结束训练", "exit"),
       ...result.messages
@@ -100,9 +166,12 @@ async function processPracticeTurn(
     if (input.action !== "start") {
       throw new Error("请点击“开始对话”开始本次练习。");
     }
-    const welcome =
-      session.welcomeText ?? getPracticeWelcome(session.condition);
-    await streamFixedText(welcome, onText);
+    const welcome = await generateFlowReply(
+      session,
+      "生成自然的开场欢迎语，简要说明这是汉译英练习，并询问参与者是否准备好。参考管理员设置的欢迎语内容，但不要逐字照抄；遵循共同提示词和当前交流风格。",
+      { welcomeGuidance: session.welcomeText ?? getPracticeWelcome(session.condition) },
+      onText
+    );
     newMessages.push(withUserMessage(submittedText, "notice"), {
       content: welcome,
       kind: "welcome",
@@ -116,8 +185,12 @@ async function processPracticeTurn(
     ) {
       throw new Error("准备好后，请选择“我准备好了”。");
     }
-    const goalQuestion = "请问你参加英语训练的主要目的是什么？";
-    await streamFixedText(goalQuestion, onText);
+    const goalQuestion = await generateFlowReply(
+      session,
+      "自然地询问参与者参加英语训练的主要目的。只询问目的，不出题、不预判训练目标，也不提题目数量。",
+      {},
+      onText
+    );
     newMessages.push(withUserMessage(submittedText, "notice"), {
       content: goalQuestion,
       kind: "goal",
@@ -142,8 +215,12 @@ async function processPracticeTurn(
     next = { phase: "required", trainingGoal: text };
   } else if (phase === "retry-choice") {
     if (input.action === "retry") {
-      const retryPrompt = "请提交修改后的英文答案。";
-      await streamFixedText(retryPrompt, onText);
+      const retryPrompt = await generateFlowReply(
+        session,
+        "自然地邀请参与者根据刚才的反馈修改答案并再次提交英文译文。不要展示参考答案。",
+        {},
+        onText
+      );
       newMessages.push(withUserMessage(submittedText, "notice"), {
         content: retryPrompt,
         kind: "notice",
@@ -155,13 +232,25 @@ async function processPracticeTurn(
       if (!question) {
         throw new Error("Practice question is missing.");
       }
-      const resolved = advanceAfterQuestion(
+      const rawResolved = advanceAfterQuestion(
         { ...session, phase },
         session.currentRequired >= requiredCount ? "extra" : "required",
         questionBank
       );
-      const referenceMessage = `本题参考表达：${question.referenceEn}`;
-      await streamFixedText(referenceMessage, onText);
+      const referenceMessage = await generateFlowReply(
+        session,
+        "参与者选择跳过当前翻译。自然回应并给出完整、准确的英文参考答案。答案必须完整保留在下方 context 的 reference 字段中，不要自行改写或省略；简短解释即可，不要增加下一道题。",
+        { chinese: question.zhPrompt, reference: question.referenceEn },
+        onText
+      );
+      const resolved = await personalizeTransition(
+        rawResolved,
+        session,
+        session.currentRequired >= requiredCount
+          ? "extra-complete"
+          : "required-complete",
+        onText
+      );
       newMessages.push(
         withUserMessage(submittedText, "notice"),
         {
@@ -189,15 +278,25 @@ async function processPracticeTurn(
         "extra",
         questionBank
       );
+      const transition = await generateFlowReply(
+        session,
+        "参与者选择继续加练。自然回应其选择，简短鼓励即可，不要重复或改写题目；后端会在下一条消息发送下一题。",
+        {},
+        onText
+      );
       newMessages.push(
         withUserMessage(submittedText, "notice"),
+        { content: transition, kind: "notice", role: "assistant" },
         ...firstExtra.messages
       );
       next = firstExtra;
     } else if (input.action === "skip") {
-      const completed = completePractice();
-      const [completionMessage] = completed.messages;
-      await streamFixedText(completionMessage.content, onText);
+      const completed = await personalizeTransition(
+        completePractice(),
+        session,
+        "finish",
+        onText
+      );
       newMessages.push(
         withUserMessage(submittedText, "notice"),
         ...completed.messages
@@ -246,10 +345,17 @@ async function processPracticeTurn(
       });
       next = { phase: "retry-choice" };
     } else {
-      const resolved = advanceAfterQuestion(
-        { ...session, phase },
-        session.currentRequired >= requiredCount ? "extra" : "required",
-        questionBank
+      const resolved = await personalizeTransition(
+        advanceAfterQuestion(
+          { ...session, phase },
+          session.currentRequired >= requiredCount ? "extra" : "required",
+          questionBank
+        ),
+        session,
+        session.currentRequired >= requiredCount
+          ? "extra-complete"
+          : "required-complete",
+        onText
       );
       newMessages.push(
         savedUser,

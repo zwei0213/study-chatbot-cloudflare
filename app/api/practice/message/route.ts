@@ -77,7 +77,13 @@ async function processPracticeTurn(
     (question) => question.phase === "required"
   ).length;
   const text = input.text?.trim() ?? "";
-  const submittedText = text || (input.action ? actionText[input.action] : "");
+  const submittedText =
+    text ||
+    (input.action === "skip" && phase === "extra-choice"
+      ? "结束训练"
+      : input.action
+        ? actionText[input.action]
+        : "");
   const newMessages: Parameters<typeof savePracticeTurn>[1] = [];
   let next: TurnState;
 

@@ -95,18 +95,18 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
       setError("");
       setConfirmExit(false);
       setStreamingText("");
-      setPendingUserText(
-        payload.text?.trim() ??
-          {
+      const actionLabel =
+        payload.action === "skip" && state.phase === "extra-choice"
+          ? "结束训练"
+          : {
             continue: "继续加练",
             ready: "我准备好了",
             retry: "愿意重试",
             skip: "跳过本题",
             start: "开始对话",
             stop: "结束训练",
-          }[payload.action ?? ""] ??
-          ""
-      );
+            }[payload.action ?? ""] ?? "";
+      setPendingUserText(payload.text?.trim() ?? actionLabel);
       const previousInput = input;
       if (payload.text !== undefined) {
         setInput("");
@@ -185,7 +185,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
     if (state?.phase === "extra-choice") {
       return [
         { action: "continue", label: "继续加练" },
-        { action: "skip", label: "结束并获取编码" },
+        { action: "skip", label: "结束训练" },
       ];
     }
     return [];
@@ -240,7 +240,11 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
 
       <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-5 sm:px-6">
         <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
-          请根据提示完成练习。你的回答将被记录并用于研究分析；你可以随时结束训练。
+          <p className="font-semibold">训练须知：</p>
+          <p>1. 对话时长：点击“开始对话”后开始交互。</p>
+          <p>
+            2. 请根据AI智能陪练提出的问题认真作答，任何消极训练行为将被记录为无效。
+          </p>
         </div>
 
         <div aria-live="polite" className="flex flex-1 flex-col gap-3 pb-6">

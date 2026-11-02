@@ -1,5 +1,9 @@
 import { randomInt } from "node:crypto";
-import { getPracticeQuestion, type PracticePhase } from "./flow";
+import {
+  getPracticeQuestion,
+  practiceQuestions,
+  type PracticePhase,
+} from "./flow";
 import type { PracticeMessageInput } from "./queries";
 import type { PracticeQuestion } from "./validation";
 
@@ -29,8 +33,13 @@ export function completePractice() {
   };
 }
 
-export function leavePractice(completedRequired: number) {
-  if (completedRequired >= 5) {
+export function leavePractice(
+  completedRequired: number,
+  requiredCount = practiceQuestions.filter(
+    (question) => question.phase === "required"
+  ).length
+) {
+  if (completedRequired >= requiredCount) {
     return completePractice();
   }
   return {
@@ -52,15 +61,32 @@ export function advanceAfterQuestion(
   questionType: "required" | "extra",
   questionBank?: PracticeQuestion[]
 ) {
+  const questions = questionBank ?? practiceQuestions;
+  const requiredCount = questions.filter(
+    (question) => question.phase === "required"
+  ).length;
+  const extraCount = questions.filter(
+    (question) => question.phase === "extra"
+  ).length;
   if (questionType === "required") {
     const currentRequired = progress.currentRequired + 1;
-    if (currentRequired >= 5) {
+    if (currentRequired >= requiredCount) {
+      if (requiredCount === 0) {
+        throw new Error("Practice requires at least one required question.");
+      }
+      if (extraCount === 0) {
+        return {
+          ...completePractice(),
+          currentExtra: progress.currentExtra,
+          currentRequired,
+        };
+      }
       return {
         currentExtra: progress.currentExtra,
         currentRequired,
         messages: [
           {
-            content: "5道常规练习已完成。是否愿意继续做加练题？",
+            content: "本阶段练习已完成。是否愿意继续做加练题？",
             kind: "notice" as const,
             role: "assistant" as const,
           },
@@ -77,7 +103,7 @@ export function advanceAfterQuestion(
   }
 
   const currentExtra = progress.currentExtra + 1;
-  if (currentExtra >= 20) {
+  if (currentExtra >= extraCount) {
     const completed = completePractice();
     return {
       ...completed,
@@ -117,13 +143,12 @@ export function nextQuestion(
   if (!question) {
     throw new Error("Practice question is missing.");
   }
-  const number = type === "required" ? currentRequired + 1 : currentExtra + 1;
   return {
     currentExtra,
     currentRequired,
     messages: [
       {
-        content: `${type === "required" ? "必做" : "加练"}第${number}题（${question.id}）：${question.zhPrompt}`,
+        content: `题目：${question.zhPrompt}`,
         kind: "question" as const,
         questionId: question.id,
         role: "assistant" as const,

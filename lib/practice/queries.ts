@@ -30,6 +30,24 @@ export async function getOrCreatePracticeSession(
     )
     .limit(1);
   if (existing[0]) {
+    if (existing[0].phase === "ready") {
+      const refreshed = {
+        model: config.model,
+        promptVersion: config.promptVersion,
+        questionsJson: JSON.stringify(config.questions),
+        systemPrompt: getPracticeSystemPrompt(
+          condition,
+          config,
+          config.questions
+        ),
+        welcomeText: getPracticeWelcome(condition, config),
+      };
+      await db
+        .update(practiceSession)
+        .set(refreshed)
+        .where(eq(practiceSession.id, existing[0].id));
+      return { ...existing[0], ...refreshed };
+    }
     return existing[0];
   }
 
@@ -44,7 +62,7 @@ export async function getOrCreatePracticeSession(
       promptVersion: config.promptVersion,
       questionsJson: JSON.stringify(config.questions),
       startedAt: new Date(),
-      systemPrompt: getPracticeSystemPrompt(condition, config),
+      systemPrompt: getPracticeSystemPrompt(condition, config, config.questions),
       userId,
       welcomeText: getPracticeWelcome(condition, config),
     })
@@ -68,6 +86,37 @@ export async function getOrCreatePracticeSession(
 
 export async function getPracticeSessionForUser(id: string, userId: string) {
   const db = await getDb();
+  const [session] = await db
+    .select()
+    .from(practiceSession)
+    .where(and(eq(practiceSession.id, id), eq(practiceSession.userId, userId)))
+    .limit(1);
+  return session ?? null;
+}
+
+export async function refreshReadyPracticeSessionForUser(
+  id: string,
+  userId: string,
+  condition: PracticeCondition
+) {
+  const db = await getDb();
+  const config = await getPracticeRuntimeConfig();
+  await db
+    .update(practiceSession)
+    .set({
+      model: config.model,
+      promptVersion: config.promptVersion,
+      questionsJson: JSON.stringify(config.questions),
+      systemPrompt: getPracticeSystemPrompt(condition, config, config.questions),
+      welcomeText: getPracticeWelcome(condition, config),
+    })
+    .where(
+      and(
+        eq(practiceSession.id, id),
+        eq(practiceSession.userId, userId),
+        eq(practiceSession.phase, "ready")
+      )
+    );
   const [session] = await db
     .select()
     .from(practiceSession)

@@ -29,6 +29,23 @@ const settingKeys = {
   welcomeLow: "welcome_low",
 } as const;
 
+function normalizeSavedCommonPrompt(value: string) {
+  return value
+    .replace(
+      "依次完成5道基础题，严格按照系统指定的B01—B05顺序出题。",
+      "按网页后端发送的顺序完成题目，不自行决定题目数量或顺序。"
+    )
+    .replaceAll("完成5道基础题后", "完成全部必做题后")
+    .replaceAll("全部5道基础题", "全部必做题");
+}
+
+function normalizeSavedWelcome(value: string) {
+  return value.replace(
+    /(?:请按顺序|先)完成5道必做题[^。]*。/g,
+    "请按页面提示完成练习。"
+  );
+}
+
 function deriveEncryptionKey() {
   const token = process.env.STUDY_ADMIN_TOKEN ?? "";
   if (token.length < 32) {
@@ -99,15 +116,21 @@ function parseStoredSettings(values: Map<string, string>) {
     }
   }
   return practiceSettingsSchema.parse({
-    commonPrompt: values.get(settingKeys.commonPrompt) ?? prompts.common,
+    commonPrompt: normalizeSavedCommonPrompt(
+      values.get(settingKeys.commonPrompt) ?? prompts.common
+    ),
     highWarmthPrompt:
       values.get(settingKeys.highWarmthPrompt) ?? prompts.highWarmth,
     lowWarmthPrompt:
       values.get(settingKeys.lowWarmthPrompt) ?? prompts.lowWarmth,
     model: values.get(settingKeys.model) ?? prompts.model,
     questions,
-    welcomeHigh: values.get(settingKeys.welcomeHigh) ?? prompts.welcomeHigh,
-    welcomeLow: values.get(settingKeys.welcomeLow) ?? prompts.welcomeLow,
+    welcomeHigh: normalizeSavedWelcome(
+      values.get(settingKeys.welcomeHigh) ?? prompts.welcomeHigh
+    ),
+    welcomeLow: normalizeSavedWelcome(
+      values.get(settingKeys.welcomeLow) ?? prompts.welcomeLow
+    ),
   });
 }
 

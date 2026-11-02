@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PracticeChat } from "@/components/practice-chat";
 
 type Condition = "low" | "high";
+
+export const metadata: Metadata = {
+  title: "AI智能陪练",
+};
 
 export function generateStaticParams() {
   return [{ condition: "low" }, { condition: "high" }];

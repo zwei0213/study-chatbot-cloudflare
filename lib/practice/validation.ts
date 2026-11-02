@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const practiceQuestionSchema = z.object({
-  id: z.string().regex(/^(B0[1-5]|E(?:0[1-9]|1[0-9]|20))$/),
-  order: z.number().int().min(1).max(25),
+  id: z.string().regex(/^(B|E)\d{2}$/),
+  order: z.number().int().min(1).max(50),
   phase: z.enum(["required", "extra"]),
   referenceEn: z.string().trim().min(1).max(500),
   zhPrompt: z.string().trim().min(1).max(500),
@@ -10,27 +10,40 @@ export const practiceQuestionSchema = z.object({
 
 export const practiceQuestionBankSchema = z
   .array(practiceQuestionSchema)
-  .length(25)
+  .min(1)
+  .max(50)
   .superRefine((questions, context) => {
     const ordered = [...questions].sort(
       (left, right) => left.order - right.order
     );
+    const required = ordered.filter((question) => question.phase === "required");
+    const extra = ordered.filter((question) => question.phase === "extra");
+    const seenIds = new Set<string>();
+    if (required.length === 0) {
+      context.addIssue({ code: "custom", message: "至少保留一道必做题。" });
+    }
     for (const [index, question] of ordered.entries()) {
-      const isRequired = index < 5;
-      const expectedId = isRequired
-        ? `B${String(index + 1).padStart(2, "0")}`
-        : `E${String(index - 4).padStart(2, "0")}`;
-      if (
-        question.order !== index + 1 ||
-        question.id !== expectedId ||
-        question.phase !== (isRequired ? "required" : "extra")
-      ) {
+      if (question.order !== index + 1 || seenIds.has(question.id)) {
         context.addIssue({
           code: "custom",
-          message: "题号、题目顺序和必做/加练分类必须保持 B01–B05、E01–E20。",
+          message: "题目顺序必须连续，题号不能重复。",
           path: [index],
         });
       }
+      seenIds.add(question.id);
+    }
+    for (const [index, question] of required.entries()) {
+      if (question.id !== `B${String(index + 1).padStart(2, "0")}`) {
+        context.addIssue({ code: "custom", message: "必做题题号需从 B01 起连续排列。", path: [index] });
+      }
+    }
+    for (const [index, question] of extra.entries()) {
+      if (question.id !== `E${String(index + 1).padStart(2, "0")}`) {
+        context.addIssue({ code: "custom", message: "加练题题号需从 E01 起连续排列。", path: [index] });
+      }
+    }
+    if (required.length > 25 || extra.length > 25) {
+      context.addIssue({ code: "custom", message: "必做题和加练题分别最多 25 道。" });
     }
   });
 

@@ -5,7 +5,7 @@ import { isStudyAdminAuthenticated } from "@/lib/study/admin";
 
 export const metadata: Metadata = {
   robots: { follow: false, index: false },
-  title: "英语陪练实验后台",
+  title: "AI智能陪练实验后台",
 };
 
 export default function PracticeAdminPage() {

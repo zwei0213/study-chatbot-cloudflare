@@ -19,6 +19,24 @@ const sourceLabel: Record<SettingsResponse["apiKeySource"], string> = {
   unavailable: "后台密钥无法解密，请重新输入 Key",
 };
 
+function reindexQuestions(questions: PracticeQuestion[]) {
+  const required = questions
+    .filter((question) => question.phase === "required")
+    .map((question, index) => ({
+      ...question,
+      id: `B${String(index + 1).padStart(2, "0")}`,
+      order: index + 1,
+    }));
+  const extra = questions
+    .filter((question) => question.phase === "extra")
+    .map((question, index) => ({
+      ...question,
+      id: `E${String(index + 1).padStart(2, "0")}`,
+      order: required.length + index + 1,
+    }));
+  return [...required, ...extra];
+}
+
 export function PracticeAdminSettings() {
   const [settings, setSettings] = useState<PracticeSettingsInput | null>(null);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
@@ -83,6 +101,54 @@ export function PracticeAdminSettings() {
     },
     []
   );
+
+  const handleAddQuestion = useCallback((phase: PracticeQuestion["phase"]) => {
+    setSettings((current) => {
+      if (!current) {
+        return current;
+      }
+      const phaseCount = current.questions.filter(
+        (question) => question.phase === phase
+      ).length;
+      if (phaseCount >= 25) {
+        return current;
+      }
+      return {
+        ...current,
+        questions: reindexQuestions([
+          ...current.questions,
+          {
+            id: "B00",
+            order: 0,
+            phase,
+            referenceEn: "",
+            zhPrompt: "",
+          },
+        ]),
+      };
+    });
+  }, []);
+
+  const handleRemoveQuestion = useCallback((id: string) => {
+    setSettings((current) => {
+      if (!current) {
+        return current;
+      }
+      const target = current.questions.find((question) => question.id === id);
+      const phaseCount = current.questions.filter(
+        (question) => question.phase === target?.phase
+      ).length;
+      if (!target || (target.phase === "required" && phaseCount <= 1)) {
+        return current;
+      }
+      return {
+        ...current,
+        questions: reindexQuestions(
+          current.questions.filter((question) => question.id !== id)
+        ),
+      };
+    });
+  }, []);
 
   const handleSettingsTextChange = useCallback(
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -155,7 +221,7 @@ export function PracticeAdminSettings() {
       setApiKey("");
       setClearApiKey(false);
       setNotice(
-        "设置已保存。新建的陪练会话会使用这些配置，进行中的会话保持原设置。"
+        "设置已保存。未开始的会话会应用新设置，进行中的会话保持原设置。提示词影响 AI 回复；练习流程和题目数量由题库决定。"
       );
     } catch (cause) {
       setError(getStudyErrorMessage(cause, "保存陪练设置失败。"));
@@ -211,7 +277,7 @@ export function PracticeAdminSettings() {
         <div>
           <h2 className="text-xl font-semibold">陪练配置</h2>
           <p className="mt-1 text-sm text-slate-600">
-            配置模型、提示词和低/高温暖题库。已有会话沿用创建时的快照。
+            提示词用于指导 AI 回复；练习流程和题数由题库控制。已开始会话沿用原设置，未开始的会话会更新为最新设置。
           </p>
         </div>
         <span
@@ -276,16 +342,14 @@ export function PracticeAdminSettings() {
       </div>
 
       <div className="mt-6 border-t border-slate-200 pt-5">
-        <h3 className="text-lg font-semibold">
-          题库（必做 5 题 + 加练 20 题）
-        </h3>
+        <h3 className="text-lg font-semibold">题库</h3>
         <p className="mt-1 text-sm text-slate-600">
-          题号与顺序固定，支持编辑中文题目和参考译文。
+          必做题 {settings.questions.filter((question) => question.phase === "required").length} 道，加练题 {settings.questions.filter((question) => question.phase === "extra").length} 道；每类最多 25 道。题号会自动重排。
         </p>
         <div className="mt-4 space-y-4">
           {settings.questions.map((question: PracticeQuestion) => (
             <div
-              className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[5rem_1fr_1fr]"
+              className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[5rem_1fr_1fr_auto]"
               key={question.id}
             >
               <div className="pt-2 text-sm font-semibold">
@@ -295,7 +359,7 @@ export function PracticeAdminSettings() {
                 </span>
               </div>
               <label className="text-xs font-medium text-slate-600">
-                中文题目
+                题目
                 <textarea
                   className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-900"
                   name={`question:${question.id}:zhPrompt`}
@@ -304,7 +368,7 @@ export function PracticeAdminSettings() {
                 />
               </label>
               <label className="text-xs font-medium text-slate-600">
-                参考译文
+                参考答案
                 <textarea
                   className="mt-1 min-h-20 w-full rounded-lg border border-slate-300 p-2 text-sm text-slate-900"
                   name={`question:${question.id}:referenceEn`}
@@ -312,8 +376,35 @@ export function PracticeAdminSettings() {
                   value={question.referenceEn}
                 />
               </label>
+              <button
+                aria-label={`删除题目 ${question.id}`}
+                className="justify-self-end rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-40"
+                disabled={question.phase === "required" && settings.questions.filter((item) => item.phase === "required").length <= 1}
+                onClick={() => handleRemoveQuestion(question.id)}
+                type="button"
+              >
+                删除题目
+              </button>
             </div>
           ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-40"
+            disabled={settings.questions.filter((question) => question.phase === "required").length >= 25}
+            onClick={() => handleAddQuestion("required")}
+            type="button"
+          >
+            添加必做题
+          </button>
+          <button
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-40"
+            disabled={settings.questions.filter((question) => question.phase === "extra").length >= 25}
+            onClick={() => handleAddQuestion("extra")}
+            type="button"
+          >
+            添加加练题
+          </button>
         </div>
       </div>
 

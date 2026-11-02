@@ -156,7 +156,7 @@ export function PracticeAdminHistory() {
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">英语陪练实验记录</h2>
+          <h2 className="text-lg font-semibold">AI智能陪练实验记录</h2>
           <p className="mt-1 text-sm text-slate-600">
             低温暖与高温暖两组的练习进度、判定结果和完整对话。
           </p>
@@ -234,8 +234,8 @@ export function PracticeAdminHistory() {
                       </span>
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">
-                      必做 {session.currentRequired}/5 · 加练{" "}
-                      {session.currentExtra} · {dateLabel(session.createdAt)}
+                      已完成必做 {session.currentRequired} 道 · 加练{" "}
+                      {session.currentExtra} 道 · {dateLabel(session.createdAt)}
                     </span>
                     {session.participantCode ? (
                       <span className="mt-1 block font-mono text-xs text-emerald-700">

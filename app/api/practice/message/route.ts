@@ -19,6 +19,7 @@ import {
 } from "@/lib/practice/flow";
 import {
   getPracticeSessionForUser,
+  refreshReadyPracticeSessionForUser,
   savePracticeTurn,
 } from "@/lib/practice/queries";
 import { checkIpRateLimit, RateLimitError } from "@/lib/ratelimit";
@@ -68,21 +69,24 @@ async function processPracticeTurn(
     retry: "愿意重试",
     skip: "跳过本题",
     start: "开始对话",
-    stop: "结束练习",
+    stop: "结束训练",
   };
   const phase = session.phase as PracticePhase;
   const questionBank = parsePracticeQuestionSnapshot(session.questionsJson);
+  const requiredCount = questionBank.filter(
+    (question) => question.phase === "required"
+  ).length;
   const text = input.text?.trim() ?? "";
   const submittedText = text || (input.action ? actionText[input.action] : "");
   const newMessages: Parameters<typeof savePracticeTurn>[1] = [];
   let next: TurnState;
 
-  if (input.action === "stop" || /^(结束练习|退出实验|不再继续)$/.test(text)) {
-    const result = leavePractice(session.currentRequired);
+  if (input.action === "stop" || /^(结束训练|结束练习|退出实验|不再继续)$/.test(text)) {
+    const result = leavePractice(session.currentRequired, requiredCount);
     const [exitMessage] = result.messages;
     await streamFixedText(exitMessage.content, onText);
     newMessages.push(
-      withUserMessage(submittedText || "结束练习", "exit"),
+      withUserMessage(submittedText || "结束训练", "exit"),
       ...result.messages
     );
     next = { ...result };
@@ -147,7 +151,7 @@ async function processPracticeTurn(
       }
       const resolved = advanceAfterQuestion(
         { ...session, phase },
-        session.currentRequired >= 5 ? "extra" : "required",
+        session.currentRequired >= requiredCount ? "extra" : "required",
         questionBank
       );
       const referenceMessage = `本题参考表达：${question.referenceEn}`;
@@ -238,7 +242,7 @@ async function processPracticeTurn(
     } else {
       const resolved = advanceAfterQuestion(
         { ...session, phase },
-        session.currentRequired >= 5 ? "extra" : "required",
+        session.currentRequired >= requiredCount ? "extra" : "required",
         questionBank
       );
       newMessages.push(
@@ -299,7 +303,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const session = await getPracticeSessionForUser(
+    let session = await getPracticeSessionForUser(
       parsed.data.sessionId,
       user.id
     );
@@ -308,6 +312,16 @@ export async function POST(request: Request) {
     }
     if (session.phase === "completed" || session.phase === "incomplete") {
       return Response.json({ error: "本次陪练已经结束。" }, { status: 409 });
+    }
+    if (parsed.data.action === "start" && session.phase === "ready") {
+      session = await refreshReadyPracticeSessionForUser(
+        session.id,
+        user.id,
+        session.condition as "high" | "low"
+      );
+      if (!session) {
+        return Response.json({ error: "找不到这条陪练记录。" }, { status: 404 });
+      }
     }
 
     const encoder = new TextEncoder();

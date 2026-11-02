@@ -60,7 +60,7 @@ export function PracticeAdmin({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             Practice Console
           </p>
-          <h1 className="mt-3 text-2xl font-semibold">英语陪练实验后台</h1>
+          <h1 className="mt-3 text-2xl font-semibold">AI智能陪练实验后台</h1>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             输入 Cloudflare Worker Secret STUDY_ADMIN_TOKEN 登录。
           </p>
@@ -108,7 +108,7 @@ export function PracticeAdmin({
               Practice Console
             </p>
             <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">
-              英语陪练实验后台
+              AI智能陪练实验后台
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               只显示低温暖/高温暖陪练实验的参与者记录。

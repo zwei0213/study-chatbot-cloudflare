@@ -103,7 +103,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
             retry: "愿意重试",
             skip: "跳过本题",
             start: "开始对话",
-            stop: "结束练习",
+            stop: "结束训练",
           }[payload.action ?? ""] ??
           ""
       );
@@ -233,29 +233,14 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
       <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
-              English practice
-            </p>
-            <h1 className="mt-1 text-xl font-semibold">汉译英 AI 陪练</h1>
+            <h1 className="text-xl font-semibold">AI智能陪练</h1>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
-            {condition === "low" ? "低温暖" : "高温暖"}
-          </span>
         </div>
       </header>
 
       <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-5 sm:px-6">
         <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-950">
-          完成 5 道必做题后，可选择是否继续加练，最多 20
-          题。请认真作答；刷新或暂时离开后可以接着练习。
-          {state ? (
-            <span className="mt-1 block text-xs text-blue-800">
-              必做 {Math.min(state.currentRequired, 5)} / 5
-              {state.currentExtra > 0
-                ? ` · 已完成加练 ${state.currentExtra} 题`
-                : ""}
-            </span>
-          ) : null}
+          请根据提示完成练习。你的回答将被记录并用于研究分析；你可以随时结束训练。
         </div>
 
         <div aria-live="polite" className="flex flex-1 flex-col gap-3 pb-6">
@@ -333,11 +318,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
               maxLength={2000}
               onChange={handleInputChange}
               onKeyDown={handleInputKeyDown}
-              placeholder={
-                state?.phase === "goal"
-                  ? "请简单说说你的训练目的…"
-                  : "请输入英文翻译…"
-              }
+              placeholder="请输入你的回答"
               value={input}
             />
             <button
@@ -354,7 +335,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
           <div className="flex justify-end pt-2">
             {confirmExit ? (
               <div className="flex items-center gap-3 text-sm">
-                <span>结束本次练习？未完成 5 道必做题将不会获得编码。</span>
+                <span>结束本次训练？未完成训练要求将无法获得完成编码。</span>
                 <button
                   className="font-semibold text-red-700"
                   disabled={busy}
@@ -377,7 +358,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
                 onClick={handleConfirmExit}
                 type="button"
               >
-                结束练习
+                结束训练
               </button>
             )}
           </div>

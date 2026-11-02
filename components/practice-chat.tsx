@@ -281,7 +281,6 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
               正在处理，请稍候…
             </p>
           ) : null}
-          <div ref={bottomRef} />
         </div>
 
         {error ? (
@@ -367,6 +366,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
             )}
           </div>
         ) : null}
+        <div ref={bottomRef} />
       </section>
     </main>
   );

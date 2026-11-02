@@ -72,8 +72,8 @@ async function personalizeTransition<T extends PracticeTurnResult>(
   if (result.phase === "extra-choice") {
     const instruction =
       reason === "required-complete"
-        ? "参与者已经完成必做阶段。自然地告知这部分已完成，并询问是否愿意自主加练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定。不要提具体题数。"
-        : "参与者完成了一道加练题。自然地询问是否继续加练或结束训练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定，也不要提具体题数。";
+        ? "参与者已经完成必做阶段。自然地简短说明已完成，并询问是否愿意自主加练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定，也不要提具体题数。最多两句话；不要重复上一条 AI 对答案的评价，不要堆叠赞美或作出陪伴承诺。"
+        : "参与者完成了一道加练题。自然地简短询问是否继续加练或结束训练。可选择的操作是‘继续加练’或‘结束训练’，不要替参与者决定，也不要提具体题数。最多两句话；不要重复上一条 AI 对答案的评价，不要堆叠赞美或作出陪伴承诺。";
     const content = await generateFlowReply(
       session,
       instruction,
@@ -187,8 +187,8 @@ async function processPracticeTurn(
     }
     const goalQuestion = await generateFlowReply(
       session,
-      "自然地询问参与者参加英语训练的主要目的。只询问目的，不出题、不预判训练目标，也不提题目数量。",
-      {},
+      "参与者刚刚按下了“我准备好了”，而且上一条 AI 消息已经问过是否准备好。不要再次欢迎、自我介绍、鼓励或询问准备好了没有。现在只用一句简短自然的话询问：参加英语训练的主要目的是什么？不要出题或预判目的。",
+      { participantHasConfirmedReady: true },
       onText
     );
     newMessages.push(withUserMessage(submittedText, "notice"), {

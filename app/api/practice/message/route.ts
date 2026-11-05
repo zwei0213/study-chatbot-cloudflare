@@ -378,11 +378,11 @@ async function processPracticeTurn(
     throw new Error("当前陪练状态无效，请刷新页面。");
   }
 
-  const messages = await savePracticeTurn(session, newMessages, next);
+  const savedMessages = await savePracticeTurn(session, newMessages, next);
   return {
     currentExtra: next.currentExtra ?? session.currentExtra,
     currentRequired: next.currentRequired ?? session.currentRequired,
-    messages: messages.slice(-newMessages.length),
+    messages: savedMessages,
     participantCode: next.participantCode ?? null,
     phase: next.phase,
     trainingGoal: next.trainingGoal ?? session.trainingGoal,

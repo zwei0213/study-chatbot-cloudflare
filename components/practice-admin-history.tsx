@@ -45,6 +45,26 @@ function dateLabel(value: string) {
   return new Date(value).toLocaleString("zh-CN");
 }
 
+function statusLabel(phase: string) {
+  if (phase === "completed") {
+    return "已完成";
+  }
+  if (phase === "incomplete") {
+    return "未完成";
+  }
+  return "进行中";
+}
+
+function statusClass(phase: string) {
+  if (phase === "completed") {
+    return "text-emerald-700";
+  }
+  if (phase === "incomplete") {
+    return "text-red-700";
+  }
+  return "text-slate-500";
+}
+
 export function PracticeAdminHistory() {
   const [sessions, setSessions] = useState<PracticeSessionSummary[]>([]);
   const [selected, setSelected] = useState<PracticeRecord | null>(null);
@@ -438,11 +458,9 @@ export function PracticeAdminHistory() {
                             : "高温暖组"}
                         </span>
                         <span
-                          className={`text-xs font-normal ${session.phase === "incomplete" ? "text-red-700" : "text-slate-500"}`}
+                          className={`text-xs font-normal ${statusClass(session.phase)}`}
                         >
-                          {session.phase === "incomplete"
-                            ? "未完成"
-                            : session.phase}
+                          {statusLabel(session.phase)}
                         </span>
                       </span>
                       <span className="mt-1 block text-xs text-slate-500">
@@ -472,13 +490,20 @@ export function PracticeAdminHistory() {
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="text-xs text-slate-500">
                   <p
-                    className={`font-mono text-sm font-semibold ${selected.phase === "incomplete" ? "text-red-700" : "text-slate-800"}`}
+                    className={`text-sm font-semibold ${statusClass(selected.phase)}`}
                   >
-                    {selected.phase === "incomplete"
-                      ? "未完成 · 退出编码"
-                      : "完成编码"}
-                    ：{selected.participantCode ?? "无"}
+                    状态：{statusLabel(selected.phase)}
                   </p>
+                  {selected.participantCode ? (
+                    <p
+                      className={`mt-1 font-mono text-sm font-semibold ${statusClass(selected.phase)}`}
+                    >
+                      {selected.phase === "incomplete"
+                        ? "退出编码"
+                        : "完成编码"}
+                      ：{selected.participantCode}
+                    </p>
+                  ) : null}
                   <p className="mt-1">
                     {selected.id} · 提示词版本 {selected.promptVersion}
                   </p>

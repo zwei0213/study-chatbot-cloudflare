@@ -166,20 +166,23 @@ export async function savePracticeTurn(
     .update(practiceSession)
     .set({ ...next, version: sql`${practiceSession.version} + 1` })
     .where(eq(practiceSession.id, session.id));
-  const inserts = messages.map((message, offset) =>
-    db.insert(practiceMessage).values({
-      content: message.content,
-      grade: message.grade ?? null,
-      id: randomUUID(),
-      kind: message.kind,
-      questionId: message.questionId ?? null,
-      role: message.role,
-      sequence: (lastMessage?.value ?? 0) + offset + 1,
-      sessionId: session.id,
-    })
+  const createdAt = new Date(Math.floor(Date.now() / 1000) * 1000);
+  const savedMessages = messages.map((message, offset) => ({
+    content: message.content,
+    createdAt,
+    grade: message.grade ?? null,
+    id: randomUUID(),
+    kind: message.kind,
+    questionId: message.questionId ?? null,
+    role: message.role,
+    sequence: (lastMessage?.value ?? 0) + offset + 1,
+    sessionId: session.id,
+  }));
+  const inserts = savedMessages.map((message) =>
+    db.insert(practiceMessage).values(message)
   );
   await db.batch([update, ...inserts]);
-  return getPracticeSessionMessages(session.id);
+  return savedMessages;
 }
 
 export async function listPracticeAdminSessions(

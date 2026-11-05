@@ -16,8 +16,25 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const id = params.get("sessionId");
   const rawCode = params.get("code")?.trim().toUpperCase();
+  const rawCondition = params.get("condition");
+  const rawStatus = params.get("status");
   if (rawCode && !/^[A-Z0-9]{1,15}$/.test(rawCode)) {
     return Response.json({ error: "完成编码格式无效。" }, { status: 400 });
+  }
+  if (
+    rawCondition !== null &&
+    rawCondition !== "low" &&
+    rawCondition !== "high"
+  ) {
+    return Response.json({ error: "筛选条件无效。" }, { status: 400 });
+  }
+  if (
+    rawStatus !== null &&
+    rawStatus !== "in-progress" &&
+    rawStatus !== "incomplete" &&
+    rawStatus !== "completed"
+  ) {
+    return Response.json({ error: "筛选状态无效。" }, { status: 400 });
   }
   try {
     if (id) {
@@ -35,7 +52,11 @@ export async function GET(request: Request) {
         headers: { "Cache-Control": "no-store" },
       });
     }
-    const sessions = await listPracticeAdminSessions(rawCode);
+    const sessions = await listPracticeAdminSessions(
+      rawCode,
+      rawCondition ?? undefined,
+      rawStatus ?? undefined
+    );
     return Response.json(
       { sessions },
       { headers: { "Cache-Control": "no-store" } }

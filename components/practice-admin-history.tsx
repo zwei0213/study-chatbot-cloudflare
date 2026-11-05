@@ -34,6 +34,13 @@ type PracticeRecord = PracticeSessionSummary & {
   }[];
 };
 
+type ConditionFilter = "all" | "low" | "high";
+type StatusFilter =
+  | "all"
+  | "in-progress"
+  | "incomplete"
+  | "completed";
+
 function dateLabel(value: string) {
   return new Date(value).toLocaleString("zh-CN");
 }
@@ -45,6 +52,9 @@ export function PracticeAdminHistory() {
   const [detailBusy, setDetailBusy] = useState(false);
   const [searchCode, setSearchCode] = useState("");
   const [searchedCode, setSearchedCode] = useState("");
+  const [conditionFilter, setConditionFilter] =
+    useState<ConditionFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -52,35 +62,48 @@ export function PracticeAdminHistory() {
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const loadSessions = useCallback(async (code: string) => {
-    setBusy(true);
-    setError("");
-    setSelected(null);
-    setSelectedIds(new Set());
-    setConfirmBulkDelete(false);
-    try {
-      const params = new URLSearchParams();
-      if (code) {
-        params.set("code", code);
+  const loadSessions = useCallback(
+    async (
+      code: string,
+      condition: ConditionFilter,
+      status: StatusFilter
+    ) => {
+      setBusy(true);
+      setError("");
+      setSelected(null);
+      setSelectedIds(new Set());
+      setConfirmBulkDelete(false);
+      try {
+        const params = new URLSearchParams();
+        if (code) {
+          params.set("code", code);
+        }
+        if (condition !== "all") {
+          params.set("condition", condition);
+        }
+        if (status !== "all") {
+          params.set("status", status);
+        }
+        const response = await fetch(
+          `/api/admin/practice-sessions${params.size ? `?${params}` : ""}`,
+          { cache: "no-store" }
+        );
+        const data = await readStudyJson<{
+          sessions: PracticeSessionSummary[];
+        }>(response);
+        setSessions(data.sessions);
+        setSearchedCode(code);
+      } catch (cause) {
+        setError(getStudyErrorMessage(cause, "读取陪练记录失败。"));
+      } finally {
+        setBusy(false);
       }
-      const response = await fetch(
-        `/api/admin/practice-sessions${params.size ? `?${params}` : ""}`,
-        { cache: "no-store" }
-      );
-      const data = await readStudyJson<{
-        sessions: PracticeSessionSummary[];
-      }>(response);
-      setSessions(data.sessions);
-      setSearchedCode(code);
-    } catch (cause) {
-      setError(getStudyErrorMessage(cause, "读取陪练记录失败。"));
-    } finally {
-      setBusy(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    loadSessions("");
+    loadSessions("", "all", "all");
   }, [loadSessions]);
 
   const handleSearchChange = useCallback(
@@ -90,14 +113,45 @@ export function PracticeAdminHistory() {
   const handleSearch = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      loadSessions(searchCode.trim().toUpperCase());
+      loadSessions(
+        searchCode.trim().toUpperCase(),
+        conditionFilter,
+        statusFilter
+      );
     },
-    [loadSessions, searchCode]
+    [conditionFilter, loadSessions, searchCode, statusFilter]
   );
   const handleClearSearch = useCallback(() => {
     setSearchCode("");
-    loadSessions("");
-  }, [loadSessions]);
+    loadSessions("", conditionFilter, statusFilter);
+  }, [conditionFilter, loadSessions, statusFilter]);
+  const handleConditionChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value;
+      if (value !== "all" && value !== "low" && value !== "high") {
+        return;
+      }
+      setConditionFilter(value);
+      loadSessions(searchCode.trim().toUpperCase(), value, statusFilter);
+    },
+    [loadSessions, searchCode, statusFilter]
+  );
+  const handleStatusChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const value = event.target.value;
+      if (
+        value !== "all" &&
+        value !== "in-progress" &&
+        value !== "incomplete" &&
+        value !== "completed"
+      ) {
+        return;
+      }
+      setStatusFilter(value);
+      loadSessions(searchCode.trim().toUpperCase(), conditionFilter, value);
+    },
+    [conditionFilter, loadSessions, searchCode]
+  );
 
   const openSession = useCallback(async (sessionId: string) => {
     setDetailBusy(true);
@@ -257,6 +311,29 @@ export function PracticeAdminHistory() {
           placeholder="输入编码查找对话"
           value={searchCode}
         />
+        <select
+          aria-label="按实验条件筛选"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+          disabled={busy}
+          onChange={handleConditionChange}
+          value={conditionFilter}
+        >
+          <option value="all">全部条件</option>
+          <option value="low">低温暖组</option>
+          <option value="high">高温暖组</option>
+        </select>
+        <select
+          aria-label="按会话状态筛选"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-500"
+          disabled={busy}
+          onChange={handleStatusChange}
+          value={statusFilter}
+        >
+          <option value="all">全部状态</option>
+          <option value="in-progress">进行中</option>
+          <option value="incomplete">未完成</option>
+          <option value="completed">已完成</option>
+        </select>
         <button
           className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
           disabled={busy || !searchCode.trim()}
@@ -270,7 +347,7 @@ export function PracticeAdminHistory() {
             onClick={handleClearSearch}
             type="button"
           >
-            显示全部
+            清除编码
           </button>
         ) : null}
       </form>
@@ -331,7 +408,9 @@ export function PracticeAdminHistory() {
             <p className="p-4 text-sm text-slate-500">
               {searchedCode
                 ? `没有找到编码 ${searchedCode} 对应的记录。`
-                : "暂时没有陪练记录。"}
+                : conditionFilter !== "all" || statusFilter !== "all"
+                  ? "没有找到符合筛选条件的记录。"
+                  : "暂时没有陪练记录。"}
             </p>
           ) : (
             <ul className="divide-y divide-slate-100">

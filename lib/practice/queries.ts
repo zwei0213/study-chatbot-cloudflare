@@ -182,14 +182,39 @@ export async function savePracticeTurn(
   return getPracticeSessionMessages(session.id);
 }
 
-export async function listPracticeAdminSessions(code?: string) {
+export async function listPracticeAdminSessions(
+  code?: string,
+  condition?: "low" | "high",
+  status?: "in-progress" | "incomplete" | "completed"
+) {
   const db = await getDb();
+  const filters = [];
+  if (code) {
+    filters.push(like(practiceSession.participantCode, `%${code}%`));
+  }
+  if (condition) {
+    filters.push(eq(practiceSession.condition, condition));
+  }
+  if (status === "in-progress") {
+    filters.push(
+      inArray(practiceSession.phase, [
+        "ready",
+        "confirm-ready",
+        "goal",
+        "required",
+        "retry-choice",
+        "retry-answer",
+        "extra-choice",
+        "extra",
+      ])
+    );
+  } else if (status === "incomplete" || status === "completed") {
+    filters.push(eq(practiceSession.phase, status));
+  }
   const query = db.select().from(practiceSession);
-  return (
-    code
-      ? query.where(like(practiceSession.participantCode, `%${code}%`))
-      : query
-  ).orderBy(desc(practiceSession.createdAt));
+  return (filters.length ? query.where(and(...filters)) : query).orderBy(
+    desc(practiceSession.createdAt)
+  );
 }
 
 export async function deletePracticeAdminSession(id: string) {

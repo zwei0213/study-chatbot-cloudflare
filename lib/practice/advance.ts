@@ -14,11 +14,7 @@ type SessionProgress = {
 };
 
 export function completePractice() {
-  let code = "";
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  for (let index = 0; index < 15; index += 1) {
-    code += alphabet[randomInt(alphabet.length)];
-  }
+  const code = createParticipantCode(15);
   return {
     completedAt: new Date(),
     messages: [
@@ -42,18 +38,28 @@ export function leavePractice(
   if (completedRequired >= requiredCount) {
     return completePractice();
   }
+  const code = createParticipantCode(10);
   return {
     completedAt: null,
     messages: [
       {
-        content: "本次常规练习尚未完成，因此无法提供实验完成编码。感谢参与。",
+        content: `本次陪练已结束。您的10位退出编码是：${code}。请返回问卷并填写该编码。`,
         kind: "exit" as const,
         role: "assistant" as const,
       },
     ],
-    participantCode: null,
+    participantCode: code,
     phase: "incomplete" as const,
   };
+}
+
+function createParticipantCode(length: number) {
+  let code = "";
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  for (let index = 0; index < length; index += 1) {
+    code += alphabet[randomInt(alphabet.length)];
+  }
+  return code;
 }
 
 export function advanceAfterQuestion(

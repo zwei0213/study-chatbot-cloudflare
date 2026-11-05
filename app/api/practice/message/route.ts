@@ -96,14 +96,13 @@ async function personalizeTransition<T extends PracticeTurnResult>(
       session,
       isCompleted
         ? "参与者已经完成实验流程。自然地表达感谢并结束对话，不要编造或提及完成编码；系统会在你的回复后附上准确编码。"
-        : "参与者选择提前结束且尚未完成必做阶段。尊重其决定，自然地结束对话并说明本次无法获得完成编码。不要责备、挽留或编造编码。",
+        : "参与者选择提前结束且尚未完成必做阶段。尊重其决定，自然地结束对话，不要责备、挽留或编造编码；系统会在你的回复后附上准确的10位退出编码。",
       {},
       onText
     );
-    const codeSuffix =
-      isCompleted && result.participantCode
-        ? `\n\n完成编码：${result.participantCode}`
-        : "";
+    const codeSuffix = result.participantCode
+      ? `\n\n${isCompleted ? "完成编码" : "退出编码"}：${result.participantCode}`
+      : "";
     if (codeSuffix) {
       onText(codeSuffix);
     }

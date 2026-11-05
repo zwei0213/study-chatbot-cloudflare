@@ -47,12 +47,17 @@ export function PracticeAdminHistory() {
   const [searchedCode, setSearchedCode] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [error, setError] = useState("");
 
   const loadSessions = useCallback(async (code: string) => {
     setBusy(true);
     setError("");
     setSelected(null);
+    setSelectedIds(new Set());
+    setConfirmBulkDelete(false);
     try {
       const params = new URLSearchParams();
       if (code) {
@@ -136,6 +141,11 @@ export function PracticeAdminHistory() {
       setSessions((current) =>
         current.filter((session) => session.id !== selected.id)
       );
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(selected.id);
+        return next;
+      });
       setSelected(null);
       setConfirmDeleteId(null);
     } catch (cause) {
@@ -151,6 +161,66 @@ export function PracticeAdminHistory() {
     }
   }, [selected]);
   const handleCancelDelete = useCallback(() => setConfirmDeleteId(null), []);
+
+  const handleToggleSession = useCallback((sessionId: string) => {
+    setConfirmBulkDelete(false);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }, []);
+
+  const allSessionsSelected =
+    sessions.length > 0 &&
+    sessions.every((session) => selectedIds.has(session.id));
+
+  const handleToggleAllSessions = useCallback(() => {
+    setConfirmBulkDelete(false);
+    setSelectedIds((current) => {
+      if (
+        sessions.length > 0 &&
+        sessions.every((session) => current.has(session.id))
+      ) {
+        return new Set();
+      }
+      return new Set(sessions.map((session) => session.id));
+    });
+  }, [sessions]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) {
+      return;
+    }
+    setBulkDeleteBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/practice-sessions", {
+        body: JSON.stringify({ sessionIds: ids }),
+        headers: { "Content-Type": "application/json" },
+        method: "DELETE",
+      });
+      const data = await readStudyJson<{ deletedIds: string[] }>(response);
+      const deleted = new Set(data.deletedIds);
+      setSessions((current) =>
+        current.filter((session) => !deleted.has(session.id))
+      );
+      if (selected && deleted.has(selected.id)) {
+        setSelected(null);
+      }
+      setSelectedIds(new Set());
+      setConfirmBulkDelete(false);
+    } catch (cause) {
+      setError(getStudyErrorMessage(cause, "批量删除陪练记录失败。"));
+    } finally {
+      setBulkDeleteBusy(false);
+    }
+  }, [selected, selectedIds]);
 
   return (
     <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -180,11 +250,11 @@ export function PracticeAdminHistory() {
 
       <form className="mb-4 flex flex-wrap gap-2" onSubmit={handleSearch}>
         <input
-          aria-label="按完成编码搜索"
+          aria-label="按编码搜索"
           className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 font-mono text-sm uppercase outline-none focus:border-slate-500"
           maxLength={15}
           onChange={handleSearchChange}
-          placeholder="输入15位完成编码查找对话"
+          placeholder="输入编码查找对话"
           value={searchCode}
         />
         <button
@@ -205,6 +275,54 @@ export function PracticeAdminHistory() {
         ) : null}
       </form>
 
+      {sessions.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-3 py-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              checked={allSessionsSelected}
+              disabled={busy || deleteBusy || bulkDeleteBusy}
+              onChange={handleToggleAllSessions}
+              type="checkbox"
+            />
+            全选当前列表
+          </label>
+          <span className="text-sm text-slate-500">
+            已选 {selectedIds.size} 条
+          </span>
+          <button
+            className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            disabled={selectedIds.size === 0 || busy || deleteBusy || bulkDeleteBusy}
+            onClick={() => setConfirmBulkDelete(true)}
+            type="button"
+          >
+            批量删除
+          </button>
+          {confirmBulkDelete ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-red-900">
+              <span>
+                确认永久删除已选的 {selectedIds.size} 条会话及其全部消息？
+              </span>
+              <button
+                className="rounded-lg bg-red-800 px-3 py-2 font-semibold text-white disabled:opacity-50"
+                  disabled={deleteBusy || bulkDeleteBusy}
+                onClick={handleBulkDelete}
+                type="button"
+              >
+                {bulkDeleteBusy ? "正在删除…" : "确认删除"}
+              </button>
+              <button
+                className="rounded-lg border border-red-200 px-3 py-2 disabled:opacity-50"
+                disabled={bulkDeleteBusy}
+                onClick={() => setConfirmBulkDelete(false)}
+                type="button"
+              >
+                取消
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.5fr)]">
         <div className="max-h-[30rem] overflow-y-auto rounded-xl border border-slate-200">
           {busy ? (
@@ -219,30 +337,48 @@ export function PracticeAdminHistory() {
             <ul className="divide-y divide-slate-100">
               {sessions.map((session) => (
                 <li key={session.id}>
-                  <button
-                    className={`w-full px-4 py-3 text-left transition hover:bg-slate-50 ${selected?.id === session.id ? "bg-blue-50" : ""}`}
-                    data-session-id={session.id}
-                    onClick={handleSessionClick}
-                    type="button"
-                  >
-                    <span className="flex items-center justify-between gap-2 text-sm font-semibold">
-                      <span>
-                        {session.condition === "low" ? "低温暖组" : "高温暖组"}
+                  <div className="flex items-start gap-3 px-3 py-3">
+                    <input
+                      aria-label={`选择${session.participantCode ? `编码 ${session.participantCode}` : "未完成"}的对话`}
+                      checked={selectedIds.has(session.id)}
+                      className="mt-1 size-4 shrink-0 accent-red-700"
+                      disabled={deleteBusy || bulkDeleteBusy}
+                      onChange={() => handleToggleSession(session.id)}
+                      type="checkbox"
+                    />
+                    <button
+                      className={`min-w-0 flex-1 text-left transition hover:bg-slate-50 ${selected?.id === session.id ? "rounded-lg bg-blue-50" : ""}`}
+                      data-session-id={session.id}
+                      onClick={handleSessionClick}
+                      type="button"
+                    >
+                      <span className="flex items-center justify-between gap-2 text-sm font-semibold">
+                        <span>
+                          {session.condition === "low"
+                            ? "低温暖组"
+                            : "高温暖组"}
+                        </span>
+                        <span
+                          className={`text-xs font-normal ${session.phase === "incomplete" ? "text-red-700" : "text-slate-500"}`}
+                        >
+                          {session.phase === "incomplete"
+                            ? "未完成"
+                            : session.phase}
+                        </span>
                       </span>
-                      <span className="text-xs font-normal text-slate-500">
-                        {session.phase}
+                      <span className="mt-1 block text-xs text-slate-500">
+                        已完成必做 {session.currentRequired} 道 · 加练{" "}
+                        {session.currentExtra} 道 · {dateLabel(session.createdAt)}
                       </span>
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500">
-                      已完成必做 {session.currentRequired} 道 · 加练{" "}
-                      {session.currentExtra} 道 · {dateLabel(session.createdAt)}
-                    </span>
-                    {session.participantCode ? (
-                      <span className="mt-1 block font-mono text-xs text-emerald-700">
-                        编码：{session.participantCode}
-                      </span>
-                    ) : null}
-                  </button>
+                      {session.participantCode ? (
+                        <span
+                          className={`mt-1 block font-mono text-xs ${session.phase === "incomplete" ? "text-red-700" : "text-emerald-700"}`}
+                        >
+                          编码：{session.participantCode}
+                        </span>
+                      ) : null}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -256,8 +392,13 @@ export function PracticeAdminHistory() {
             <div className="space-y-3">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="text-xs text-slate-500">
-                  <p className="font-mono text-sm font-semibold text-slate-800">
-                    完成编码：{selected.participantCode ?? "未完成"}
+                  <p
+                    className={`font-mono text-sm font-semibold ${selected.phase === "incomplete" ? "text-red-700" : "text-slate-800"}`}
+                  >
+                    {selected.phase === "incomplete"
+                      ? "未完成 · 退出编码"
+                      : "完成编码"}
+                    ：{selected.participantCode ?? "无"}
                   </p>
                   <p className="mt-1">
                     {selected.id} · 提示词版本 {selected.promptVersion}
@@ -265,7 +406,7 @@ export function PracticeAdminHistory() {
                 </div>
                 <button
                   className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
-                  disabled={deleteBusy}
+                  disabled={deleteBusy || bulkDeleteBusy}
                   onClick={handleRequestDelete}
                   type="button"
                 >

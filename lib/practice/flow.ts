@@ -68,7 +68,7 @@ export function getPracticeSystemPrompt(
 ) {
   const style =
     condition === "high" ? settings.highWarmthPrompt : settings.lowWarmthPrompt;
-  return `${settings.commonPrompt}\n\n${style}\n\n系统执行说明：练习流程、当前状态和题目顺序由网页后端管理。只能根据后端发送的当前题目和状态回应，不要自行规定题目数量、题号、练习步骤或改变流程。此轮以外的题目流程由后端安排。题库当前包含 ${questions.filter((question) => question.phase === "required").length} 道必做题和 ${questions.filter((question) => question.phase === "extra").length} 道加练题；不要主动向参与者说明题目总数。`;
+  return `${settings.commonPrompt}\n\n${style}\n\n系统执行说明：练习流程、当前状态和题目顺序由网页后端管理。只能根据后端发送的当前题目和状态回应，不要自行规定题目数量、题号、练习步骤或改变流程。此轮以外的题目流程由后端安排。题库当前包含 ${questions.filter((question) => question.phase === "required").length} 道必做题和 ${questions.filter((question) => question.phase === "extra").length} 道加练题；不要主动向参与者说明题目总数。编码规则以本说明为准：完成必做题后按现有流程发放15位完成编码；未完成时用户主动结束，尊重其决定并由网页后端附上10位退出编码。不要声称提前退出无法获得编码，不要自行生成编码，也不要劝说用户继续。`;
 }
 
 export function getPracticeWelcome(

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   deletePracticeAdminSession,
+  deletePracticeAdminSessions,
   getPracticeAdminDetail,
   listPracticeAdminSessions,
 } from "@/lib/practice/queries";
@@ -50,12 +51,26 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "请先登录管理员后台。" }, { status: 401 });
   }
   const body = z
-    .object({ sessionId: idSchema })
+    .union([
+      z.object({ sessionId: idSchema }).strict(),
+      z.object({
+        sessionIds: z.array(idSchema).min(1).max(1000),
+      }).strict(),
+    ])
     .safeParse(await request.json().catch(() => null));
   if (!body.success) {
     return Response.json({ error: "记录编号格式无效。" }, { status: 400 });
   }
   try {
+    if ("sessionIds" in body.data) {
+      const deletedIds = await deletePracticeAdminSessions(
+        [...new Set(body.data.sessionIds)]
+      );
+      return Response.json(
+        { deletedIds },
+        { headers: { "Cache-Control": "no-store" } }
+      );
+    }
     const deleted = await deletePracticeAdminSession(body.data.sessionId);
     if (!deleted) {
       return Response.json({ error: "找不到这条陪练记录。" }, { status: 404 });

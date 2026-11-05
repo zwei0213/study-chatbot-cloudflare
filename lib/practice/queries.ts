@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { practiceMessage, practiceSession } from "@/lib/db/schema";
 import { getPracticeRuntimeConfig } from "./config";
@@ -199,6 +199,23 @@ export async function deletePracticeAdminSession(id: string) {
     .where(eq(practiceSession.id, id))
     .returning({ id: practiceSession.id });
   return deleted.length > 0;
+}
+
+export async function deletePracticeAdminSessions(ids: string[]) {
+  if (ids.length === 0) {
+    return [];
+  }
+  const db = await getDb();
+  const deletedIds: string[] = [];
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    const chunk = ids.slice(offset, offset + 100);
+    const deleted = await db
+      .delete(practiceSession)
+      .where(inArray(practiceSession.id, chunk))
+      .returning({ id: practiceSession.id });
+    deletedIds.push(...deleted.map((session) => session.id));
+  }
+  return deletedIds;
 }
 
 export async function listPracticeAdminExportRows() {

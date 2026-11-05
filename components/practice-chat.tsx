@@ -338,7 +338,7 @@ export function PracticeChat({ condition }: { condition: PracticeCondition }) {
           <div className="flex justify-end pt-2">
             {confirmExit ? (
               <div className="flex items-center gap-3 text-sm">
-                <span>结束本次训练？未完成训练要求将无法获得完成编码。</span>
+                <span>确定结束本次训练？</span>
                 <button
                   className="font-semibold text-red-700"
                   disabled={busy}
